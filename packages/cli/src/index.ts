@@ -50,7 +50,7 @@ async function bootstrap(
   }
 
   // Resolve YAML plugin entries to NeoHexoPlugin instances
-  const resolver = createPluginResolver();
+  const resolver = createPluginResolver(baseDir);
   const userConfig = await yamlConfigToUserConfig(yamlConfig, resolver);
 
   const hexo = new NeoHexo(baseDir, userConfig);
