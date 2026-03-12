@@ -1,0 +1,23 @@
+{
+  "name": "@neo-hexo/injector",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "HTML injection plugin for Neo-Hexo — head, body start/end injection.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist/"],
+  "peerDependencies": {
+    "@neo-hexo/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}
