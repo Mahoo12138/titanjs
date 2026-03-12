@@ -28,6 +28,7 @@ const BUILTIN_PLUGINS: Record<string, string> = {
   'console': '@neo-hexo/console',
   'deployer-git': '@neo-hexo/deployer-git',
   'theme': '@neo-hexo/theme',
+  'server': '@neo-hexo/server',
 };
 
 // ─── Resolver ────────────────────────────────────────────────────────────────

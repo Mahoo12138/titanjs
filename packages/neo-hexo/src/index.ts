@@ -115,6 +115,21 @@ export {
   getBuiltinPluginNames,
 } from '@neo-hexo/cli';
 
+// ── Server API ───────────────────────────────────────────────────────────────
+export {
+  default as serverPlugin,
+  DevServer,
+  WebSocketManager,
+  WebSocketConnection,
+  LazyRenderCache,
+  getMimeType,
+  computeETag,
+  createClientScript,
+  type DevServerOptions,
+  type ServerPluginOptions,
+  type CachedRender,
+} from '@neo-hexo/server';
+
 // ── Theme API ────────────────────────────────────────────────────────────────
 export {
   default as themePlugin,

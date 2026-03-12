@@ -26,8 +26,8 @@ describe('Plugin Resolver', () => {
       expect(BUILTIN_PLUGINS['deployer-git']).toBe('@neo-hexo/deployer-git');
     });
 
-    it('should have 11 built-in plugins', () => {
-      expect(Object.keys(BUILTIN_PLUGINS)).toHaveLength(11);
+    it('should have 12 built-in plugins', () => {
+      expect(Object.keys(BUILTIN_PLUGINS)).toHaveLength(12);
     });
   });
 
@@ -40,7 +40,8 @@ describe('Plugin Resolver', () => {
       expect(names).toContain('processor');
       expect(names).toContain('deployer-git');
       expect(names).toContain('theme');
-      expect(names).toHaveLength(11);
+      expect(names).toContain('server');
+      expect(names).toHaveLength(12);
     });
   });
 

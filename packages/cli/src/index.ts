@@ -245,6 +245,80 @@ const main = defineCommand({
       },
     }),
 
+    server: defineCommand({
+      meta: { description: 'Start the development server.' },
+      args: {
+        port: {
+          type: 'string',
+          alias: 'p',
+          description: 'Port to listen on (default: 4000)',
+        },
+        host: {
+          type: 'string',
+          description: 'Host to bind to (default: localhost)',
+        },
+        config: {
+          type: 'string',
+          alias: 'c',
+          description: 'Config file path',
+        },
+        cwd: {
+          type: 'string',
+          description: 'Working directory',
+        },
+      },
+      async run({ args }) {
+        const baseDir = nodePath.resolve(str(args.cwd) || process.cwd());
+        const hexo = await bootstrap(baseDir, str(args.config) || undefined);
+        try {
+          await hexo.build();
+          const cmdArgs: Record<string, unknown> & { _: string[] } = { _: [] };
+          if (args.port) cmdArgs.port = parseInt(str(args.port), 10);
+          if (args.host) cmdArgs.host = str(args.host);
+          await hexo.commands.execute('server', cmdArgs);
+        } finally {
+          await hexo.exit();
+        }
+      },
+    }),
+
+    serve: defineCommand({
+      meta: { description: 'Alias for "server" — start the dev server.' },
+      args: {
+        port: {
+          type: 'string',
+          alias: 'p',
+          description: 'Port to listen on (default: 4000)',
+        },
+        host: {
+          type: 'string',
+          description: 'Host to bind to (default: localhost)',
+        },
+        config: {
+          type: 'string',
+          alias: 'c',
+          description: 'Config file path',
+        },
+        cwd: {
+          type: 'string',
+          description: 'Working directory',
+        },
+      },
+      async run({ args }) {
+        const baseDir = nodePath.resolve(str(args.cwd) || process.cwd());
+        const hexo = await bootstrap(baseDir, str(args.config) || undefined);
+        try {
+          await hexo.build();
+          const cmdArgs: Record<string, unknown> & { _: string[] } = { _: [] };
+          if (args.port) cmdArgs.port = parseInt(str(args.port), 10);
+          if (args.host) cmdArgs.host = str(args.host);
+          await hexo.commands.execute('server', cmdArgs);
+        } finally {
+          await hexo.exit();
+        }
+      },
+    }),
+
     list: defineCommand({
       meta: { description: 'List routes, posts, tags, or categories.' },
       args: {

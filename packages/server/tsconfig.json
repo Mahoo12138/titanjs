@@ -6,9 +6,6 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../core" },
-    { "path": "../cli" },
-    { "path": "../server" },
-    { "path": "../theme" }
+    { "path": "../core" }
   ]
 }
