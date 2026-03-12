@@ -1,14 +1,82 @@
 /**
  * @neo-hexo/core — Configuration System
  *
- * Type-safe config loading with `defineConfig()` helper.
- * Users write `neo-hexo.config.ts` and get full IDE autocomplete.
+ * Supports two config modes:
+ *   1. **YAML config** (`neo-hexo.yaml`) — declarative, static configuration.
+ *      Plugins are listed by name and resolved at load time.
+ *   2. **Programmatic config** — via `defineConfig()` for testing and advanced use.
  */
 
 import type { NeoHexoPlugin } from './plugin.js';
 import type { ResolvedConfig } from './lifecycle.js';
 
-// ─── User Config ─────────────────────────────────────────────────────────────
+// ─── YAML Config (what users write in neo-hexo.yaml) ─────────────────────────
+
+/**
+ * Plugin entry in YAML config.
+ * Can be a simple string name or an object with name + options.
+ *
+ * ```yaml
+ * plugins:
+ *   - renderer-markdown           # shorthand
+ *   - name: highlight             # with options
+ *     theme: github-dark
+ *     lineNumbers: true
+ *   - name: deployer-git
+ *     repo: https://github.com/user/repo.git
+ *     branch: gh-pages
+ * ```
+ */
+export type YamlPluginEntry = string | { name: string; [key: string]: unknown };
+
+/**
+ * The raw shape of a `neo-hexo.yaml` config file (after YAML parsing).
+ */
+export interface YamlConfig {
+  /** Site title. */
+  title?: string;
+  /** Site subtitle. */
+  subtitle?: string;
+  /** Site description. */
+  description?: string;
+  /** Site author. */
+  author?: string;
+  /** Site language. */
+  language?: string | string[];
+  /** Timezone (IANA). */
+  timezone?: string;
+  /** Site URL. */
+  url?: string;
+  /** Root path (default: '/'). */
+  root?: string;
+
+  // ── Directories ──
+  sourceDir?: string;
+  publicDir?: string;
+  themeDir?: string;
+
+  // ── Build ──
+  permalink?: string;
+  defaultLayout?: string;
+  titlecase?: boolean;
+
+  // ── Database ──
+  database?: {
+    adapter?: 'json' | 'sqlite';
+    path?: string;
+  };
+
+  // ── Plugins (by name) ──
+  plugins?: YamlPluginEntry[];
+
+  // ── Theme config ──
+  theme?: Record<string, unknown>;
+
+  /** Catch-all for user extensions. */
+  [key: string]: unknown;
+}
+
+// ─── Programmatic Config (for testing / advanced use) ─────────────────────────
 
 export interface UserConfig {
   /** Site title. */
@@ -50,7 +118,7 @@ export interface UserConfig {
     path?: string;
   };
 
-  // ── Plugins ──
+  // ── Plugins (resolved instances for programmatic use) ──
   plugins?: NeoHexoPlugin[];
 
   // ── Theme config ──
@@ -87,13 +155,7 @@ export const defaultConfig: Required<
 // ─── Config Resolution ──────────────────────────────────────────────────────
 
 /**
- * `defineConfig()` — identity helper that provides type checking for config files.
- *
- * ```ts
- * // neo-hexo.config.ts
- * import { defineConfig } from '@neo-hexo/core';
- * export default defineConfig({ title: 'My Blog' });
- * ```
+ * `defineConfig()` — identity helper for programmatic config.
  */
 export function defineConfig(config: UserConfig): UserConfig {
   return config;
@@ -118,4 +180,49 @@ export function resolveConfig(userConfig: UserConfig, baseDir: string): Resolved
     ...merged,
     _baseDir: baseDir,
   } as ResolvedConfig;
+}
+
+// ─── Plugin Resolution ───────────────────────────────────────────────────────
+
+/**
+ * A plugin resolver maps a plugin name (from YAML config) to a NeoHexoPlugin instance.
+ * The CLI package registers resolvers; core provides the interface.
+ */
+export type PluginResolver = (
+  name: string,
+  options: Record<string, unknown>,
+) => NeoHexoPlugin | Promise<NeoHexoPlugin>;
+
+/**
+ * Normalize a YAML plugin entry to { name, options }.
+ */
+export function normalizePluginEntry(
+  entry: YamlPluginEntry,
+): { name: string; options: Record<string, unknown> } {
+  if (typeof entry === 'string') {
+    return { name: entry, options: {} };
+  }
+  const { name, ...options } = entry;
+  return { name, options };
+}
+
+/**
+ * Convert a YAML config to a UserConfig by resolving plugins via a resolver function.
+ */
+export async function yamlConfigToUserConfig(
+  yaml: YamlConfig,
+  resolver: PluginResolver,
+): Promise<UserConfig> {
+  const { plugins: yamlPlugins, ...rest } = yaml;
+
+  const plugins: NeoHexoPlugin[] = [];
+  if (yamlPlugins) {
+    for (const entry of yamlPlugins) {
+      const { name, options } = normalizePluginEntry(entry);
+      const plugin = await resolver(name, options);
+      plugins.push(plugin);
+    }
+  }
+
+  return { ...rest, plugins };
 }

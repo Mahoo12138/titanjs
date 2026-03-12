@@ -26,7 +26,17 @@ export {
 } from './lifecycle.js';
 
 // Config
-export { defineConfig, resolveConfig, defaultConfig, type UserConfig } from './config.js';
+export {
+  defineConfig,
+  resolveConfig,
+  defaultConfig,
+  normalizePluginEntry,
+  yamlConfigToUserConfig,
+  type UserConfig,
+  type YamlConfig,
+  type YamlPluginEntry,
+  type PluginResolver,
+} from './config.js';
 
 // Main class
 export { NeoHexo } from './neo-hexo.js';
