@@ -11,7 +11,7 @@
   },
   "files": ["dist/"],
   "dependencies": {
-    "shiki": "^3.0.0"
+    "shiki": "^4.0.2"
   },
   "peerDependencies": {
     "@neo-hexo/core": "workspace:*"
