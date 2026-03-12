@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { I18n, normalizeLang } from '../src/index.js';
 
 describe('@neo-hexo/i18n', () => {
