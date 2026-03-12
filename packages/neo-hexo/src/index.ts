@@ -95,6 +95,12 @@ export {
   type CommandArgs,
   type CommandHandler,
   type CommandEntry,
+
+  // View registry
+  ViewRegistry,
+  ViewRegistryKey,
+  type View,
+  type ViewResolver,
 } from '@neo-hexo/core';
 
 // ── CLI API ──────────────────────────────────────────────────────────────────
@@ -108,3 +114,16 @@ export {
   BUILTIN_PLUGINS,
   getBuiltinPluginNames,
 } from '@neo-hexo/cli';
+
+// ── Theme API ────────────────────────────────────────────────────────────────
+export {
+  default as themePlugin,
+  loadViews,
+  loadThemeAssets,
+  loadThemeConfig,
+  loadLanguages,
+  walkDir,
+  stripExt,
+  type ThemeOptions,
+  type ThemeConfig,
+} from '@neo-hexo/theme';

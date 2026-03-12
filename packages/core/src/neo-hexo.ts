@@ -18,6 +18,7 @@ import { PostProcessor, PostServiceKey, type FrontMatterParser } from './post.js
 import { ScaffoldManager, ScaffoldServiceKey } from './scaffold.js';
 import { HelperRegistry, HelperRegistryKey } from './helper-registry.js';
 import { CommandRegistry, CommandRegistryKey } from './command-registry.js';
+import { ViewRegistry, ViewRegistryKey } from './view-registry.js';
 
 // ─── NeoHexo ─────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ export class NeoHexo {
   scaffold!: ScaffoldManager;
   /** Template helper functions registry. */
   helpers!: HelperRegistry;
+  /** Template view registry. */
+  views!: ViewRegistry;
   /** CLI command registry. */
   commands!: CommandRegistry;
 
@@ -144,6 +147,10 @@ export class NeoHexo {
     // ── Helper Registry ──
     this.helpers = new HelperRegistry();
     this.ctx.provide(HelperRegistryKey, this.helpers);
+
+    // ── View Registry ──
+    this.views = new ViewRegistry();
+    this.ctx.provide(ViewRegistryKey, this.views);
 
     // ── Command Registry ──
     this.commands = new CommandRegistry();

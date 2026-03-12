@@ -29,6 +29,8 @@ export interface EdgeOptions {
 export interface EdgeInstance {
   render(templatePath: string, data: Record<string, unknown>): Promise<string>;
   renderRaw(source: string, data: Record<string, unknown>): Promise<string>;
+  /** Mount an additional views directory for template resolution. */
+  mount(dir: string): void;
 }
 
 // ─── Service Key ─────────────────────────────────────────────────────────────
@@ -79,6 +81,10 @@ export default function edgeRendererPlugin(
         },
         async renderRaw(source: string, data: Record<string, unknown>): Promise<string> {
           return edge.renderRaw(source, data);
+        },
+        /** Mount an additional views directory (e.g. theme layout dir). */
+        mount(dir: string): void {
+          edge.mount(dir);
         },
       };
 

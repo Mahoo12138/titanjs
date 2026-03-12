@@ -93,3 +93,11 @@ export {
   type CommandHandler,
   type CommandEntry,
 } from './command-registry.js';
+
+// View registry
+export {
+  ViewRegistry,
+  ViewRegistryKey,
+  type View,
+  type ViewResolver,
+} from './view-registry.js';

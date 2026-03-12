@@ -6,12 +6,12 @@
   "description": "Neo-Hexo: A modern static site generator, reimagined.",
   "packageManager": "pnpm@10.6.2",
   "scripts": {
-    "build": "tsc -b packages/core",
-    "clean": "tsc -b packages/core --clean",
+    "build": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/theme packages/neo-hexo",
+    "clean": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/theme packages/neo-hexo --clean",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/**/*.ts",
-    "typecheck": "tsc -b packages/core --noEmit"
+    "typecheck": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/theme packages/neo-hexo --noEmit"
   },
   "repository": {
     "type": "git",

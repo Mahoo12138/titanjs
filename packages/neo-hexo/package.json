@@ -27,6 +27,7 @@
     "@neo-hexo/processor": "workspace:*",
     "@neo-hexo/renderer-edge": "workspace:*",
     "@neo-hexo/renderer-markdown": "workspace:*",
+    "@neo-hexo/theme": "workspace:*",
     "@neo-hexo/utils": "workspace:*"
   },
   "devDependencies": {

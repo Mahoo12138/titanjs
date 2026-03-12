@@ -1,0 +1,26 @@
+{
+  "name": "@neo-hexo/theme",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Theme system plugin for Neo-Hexo — view loading, layout resolution, and route rendering.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist/"],
+  "peerDependencies": {
+    "@neo-hexo/core": "workspace:*"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}

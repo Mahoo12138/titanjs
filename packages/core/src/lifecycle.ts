@@ -119,6 +119,8 @@ export interface LifecycleHooks {
 
   // ── Template ──
   resolveLocals: (locals: TemplateLocals) => TemplateLocals | Promise<TemplateLocals>;
+  /** Render a route to HTML output. Theme plugin taps this. */
+  renderRoute: (route: Route, locals: TemplateLocals) => string | Promise<string>;
 
   // ── Exit ──
   beforeExit: (error?: Error) => void | Promise<void>;
@@ -166,6 +168,7 @@ export function createLifecycleHooks(): LifecycleHookInstances {
 
     // Template
     resolveLocals: new Hook({ name: 'resolveLocals', strategy: 'waterfall' }),
+    renderRoute: new Hook({ name: 'renderRoute', strategy: 'waterfall' }),
 
     // Exit
     beforeExit: new Hook({ name: 'beforeExit', strategy: 'sequential' }),

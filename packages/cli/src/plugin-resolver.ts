@@ -27,6 +27,7 @@ const BUILTIN_PLUGINS: Record<string, string> = {
   'injector': '@neo-hexo/injector',
   'console': '@neo-hexo/console',
   'deployer-git': '@neo-hexo/deployer-git',
+  'theme': '@neo-hexo/theme',
 };
 
 // ─── Resolver ────────────────────────────────────────────────────────────────
