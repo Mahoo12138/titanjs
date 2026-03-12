@@ -1,0 +1,39 @@
+{
+  "name": "neo-hexo",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Neo-Hexo — A modern static site generator. Meta package that bundles core, CLI, and built-in plugins.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "neo-hexo": "./node_modules/@neo-hexo/cli/dist/bin.js"
+  },
+  "files": ["dist/"],
+  "dependencies": {
+    "@neo-hexo/cli": "workspace:*",
+    "@neo-hexo/core": "workspace:*",
+    "@neo-hexo/console": "workspace:*",
+    "@neo-hexo/deployer-git": "workspace:*",
+    "@neo-hexo/filter": "workspace:*",
+    "@neo-hexo/fs": "workspace:*",
+    "@neo-hexo/generator": "workspace:*",
+    "@neo-hexo/helper": "workspace:*",
+    "@neo-hexo/highlight": "workspace:*",
+    "@neo-hexo/injector": "workspace:*",
+    "@neo-hexo/processor": "workspace:*",
+    "@neo-hexo/renderer-edge": "workspace:*",
+    "@neo-hexo/renderer-markdown": "workspace:*",
+    "@neo-hexo/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}
