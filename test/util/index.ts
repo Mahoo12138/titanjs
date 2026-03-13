@@ -1,1 +1,0 @@
-export { readStream } from './stream';
