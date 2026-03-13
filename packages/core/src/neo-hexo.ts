@@ -6,9 +6,10 @@
  */
 
 import * as nodePath from 'node:path';
+import * as fs from 'node:fs/promises';
 import { Context } from './context.js';
 import { type UserConfig, resolveConfig } from './config.js';
-import { createLifecycleHooks, type LifecycleHookInstances, type ResolvedConfig } from './lifecycle.js';
+import { createLifecycleHooks, type LifecycleHookInstances, type ResolvedConfig, type Route, type TemplateLocals } from './lifecycle.js';
 import { type NeoHexoPlugin, sortPlugins } from './plugin.js';
 import type { Disposable } from './hooks.js';
 import { Box } from './box.js';
@@ -99,7 +100,7 @@ export class NeoHexo {
     const cfg = this.config;
 
     // ── Box ──
-    this.box = new Box(cfg.sourceDir);
+    this.box = new Box(nodePath.resolve(this.baseDir, cfg.sourceDir));
 
     // ── Router ──
     this.router = new Router();
@@ -194,7 +195,7 @@ export class NeoHexo {
   }
 
   /**
-   * Full build: process sources, run generators, write output.
+   * Full build: process sources, run generators, render, write output.
    */
   async build(): Promise<void> {
     if (!this.initialized) await this.init();
@@ -215,8 +216,56 @@ export class NeoHexo {
     const locals = this.getSiteLocals();
 
     await this.hooks.beforeGenerate.call(locals);
-    await this.hooks.generateRoutes.call(locals);
+    const generatedRoutes = await this.hooks.generateRoutes.call(locals) as unknown as Route[];
+    const routes: Route[] = Array.isArray(generatedRoutes) ? generatedRoutes : [];
+
+    // Add generated routes to the Router
+    for (const route of routes) {
+      this.router.set(route.path, () => this.renderRoute(route, locals));
+    }
+
     await this.hooks.afterGenerate.call();
+
+    // ── Write output ──
+    const publicDir = nodePath.resolve(this.baseDir, this.config.publicDir);
+    for (const routePath of this.router.list()) {
+      const content = await this.router.resolve(routePath);
+      if (content === null) continue;
+
+      const filePath = nodePath.join(publicDir, routePath);
+      await fs.mkdir(nodePath.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, content, 'utf-8');
+    }
+  }
+
+  /**
+   * Render a single route through the renderRoute hook.
+   */
+  private async renderRoute(route: Route, siteLocals: ReturnType<NeoHexo['getSiteLocals']>): Promise<string> {
+    const templateLocals: TemplateLocals = {
+      page: route.data,
+      path: route.path,
+      url: '/' + route.path,
+      config: this.config,
+      site: siteLocals,
+    };
+
+    // Run through resolveLocals hook
+    const resolvedLocals = await this.hooks.resolveLocals.call(templateLocals) as unknown as TemplateLocals;
+    const finalLocals = resolvedLocals ?? templateLocals;
+
+    // Run through renderRoute hook (theme plugin renders template here)
+    if (!this.hooks.renderRoute.isEmpty) {
+      const html = await this.hooks.renderRoute.call(route, finalLocals);
+      if (typeof html === 'string') {
+        // Run afterHtmlRender filters
+        return this.hooks.afterHtmlRender.call(html) as unknown as Promise<string>;
+      }
+    }
+
+    // Fallback: serialize data as string
+    const data = route.data;
+    return typeof data === 'string' ? data : JSON.stringify(data);
   }
 
   /**

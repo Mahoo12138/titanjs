@@ -21,6 +21,8 @@ export interface Renderer {
   output: string;
   /** Render source content to output format. */
   render(source: string, options?: RenderOptions): string | Promise<string>;
+  /** Optional: mount a directory for template resolution (e.g., layout dir). */
+  mount?(dir: string): void;
 }
 
 /** Options passed to a renderer. */
@@ -125,6 +127,17 @@ export class RenderPipeline {
    */
   getRegisteredExtensions(): string[] {
     return [...this.renderers.keys()];
+  }
+
+  /**
+   * Mount a directory for template resolution on renderers that support it.
+   */
+  mountDir(dir: string): void {
+    for (const renderer of new Set(this.renderers.values())) {
+      if (typeof renderer.mount === 'function') {
+        renderer.mount(dir);
+      }
+    }
   }
 
   // ── Private ──

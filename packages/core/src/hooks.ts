@@ -138,8 +138,10 @@ export class Hook<Args extends unknown[] = [], R = void> {
   }
 
   private async callParallel(args: Args): Promise<R> {
-    await Promise.all(this.taps.map((tap) => tap.fn(...args)));
-    return undefined as R;
+    const results = await Promise.all(this.taps.map((tap) => tap.fn(...args)));
+    // Flatten arrays (e.g., generateRoutes returns Route[] from each tap)
+    const flat = results.flatMap((r) => (Array.isArray(r) ? r : r != null ? [r] : []));
+    return flat as R;
   }
 
   private async callWaterfall(args: Args): Promise<R> {
