@@ -22,7 +22,9 @@ import type {
   SourceFile,
   PostData,
   PostProcessor,
+  SiteLocals,
 } from '@neo-hexo/core';
+import { PostServiceKey } from '@neo-hexo/core';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,28 +57,29 @@ export default function processorPlugin(
   options: ProcessorOptions = {},
 ): NeoHexoPlugin {
   const {
-    postDir: _postDir = '_posts',
-    draftDir: _draftDir = '_drafts',
-    dataDir: _dataDir = '_data',
-    includeDrafts: _includeDrafts = false,
+    postDir = '_posts',
+    draftDir = '_drafts',
+    dataDir = '_data',
+    includeDrafts = false,
   } = options;
-  void _postDir; void _draftDir; void _dataDir; void _includeDrafts;
+
+  // Shared closure state between apply() and hooks
+  const data: ProcessedData = {
+    posts: [],
+    pages: [],
+    dataFiles: new Map(),
+    assets: [],
+  };
+  let postProcessor: PostProcessor | null = null;
 
   return {
     name: 'neo-hexo:processor',
     enforce: 'pre',
 
     apply(ctx: Context) {
-      // Initialize the processed data store
-      const data: ProcessedData = {
-        posts: [],
-        pages: [],
-        dataFiles: new Map(),
-        assets: [],
-      };
       ctx.provide(ProcessedDataKey, data);
+      postProcessor = ctx.tryInject(PostServiceKey) ?? null;
 
-      // We tap the processFile hook to handle each file
       return {
         dispose() {
           data.posts.length = 0;
@@ -88,9 +91,55 @@ export default function processorPlugin(
     },
 
     hooks: {
-      processFile(_file: SourceFile) {
-        // This will be called by the NeoHexo build process for each source file
-        // Actual implementation delegates based on path patterns
+      // Populate SiteLocals with processed data before generators run
+      beforeGenerate(locals: SiteLocals) {
+        locals.posts = data.posts;
+        locals.pages = data.pages;
+        locals.data = Object.fromEntries(data.dataFiles);
+      },
+
+      async processFile(file: SourceFile) {
+        const fileType = classifyFile(file.path, { postDir, draftDir, dataDir });
+
+        if (file.type === 'delete') {
+          if (fileType === 'post' || fileType === 'draft') {
+            const idx = data.posts.findIndex((p) => p.path === file.path);
+            if (idx !== -1) data.posts.splice(idx, 1);
+          } else if (fileType === 'page') {
+            const idx = data.pages.findIndex((p) => p.path === file.path);
+            if (idx !== -1) data.pages.splice(idx, 1);
+          } else if (fileType === 'data') {
+            const ext = nodePath.extname(file.path);
+            const key = nodePath.basename(file.path, ext);
+            data.dataFiles.delete(key);
+          }
+          return;
+        }
+
+        if (fileType === 'post' || (fileType === 'draft' && includeDrafts)) {
+          if (postProcessor) {
+            const postData = await processPost(file, postProcessor);
+            if (postData) {
+              const rendered = await postProcessor.render(postData);
+              data.posts.push(rendered);
+            }
+          }
+        } else if (fileType === 'page') {
+          if (postProcessor) {
+            const pageData = await processPost(file, postProcessor);
+            if (pageData) {
+              const rendered = await postProcessor.render(pageData);
+              data.pages.push(rendered);
+            }
+          }
+        } else if (fileType === 'data') {
+          const result = await processDataFile(file);
+          if (result) {
+            data.dataFiles.set(result.key, result.value);
+          }
+        } else {
+          data.assets.push(file.path);
+        }
       },
     },
   };
