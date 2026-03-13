@@ -95,7 +95,11 @@ export default function edgeRendererPlugin(
         extensions: ['edge'],
         output: 'html',
         async render(source: string, options?: Record<string, unknown>) {
-          return edge.renderRaw(source, options ?? {});
+          const data = options ?? {};
+          return edge.share(data).renderRaw(source, data);
+        },
+        mount(dir: string) {
+          edge.mount(dir);
         },
       };
 
