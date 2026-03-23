@@ -12,3 +12,5 @@ coverage/
 .vscode
 dist/
 tsconfig.tsbuildinfo
+.titan-cache/
+public/
