@@ -1,0 +1,26 @@
+{
+  "name": "@titan/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "titan": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@titan/core": "workspace:*",
+    "@titan/types": "workspace:*",
+    "@titan/vite-plugin": "workspace:*",
+    "cac": "^6.7.14",
+    "picocolors": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}
