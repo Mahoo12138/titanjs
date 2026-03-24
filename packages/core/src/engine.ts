@@ -3,12 +3,11 @@
  *
  * Load → Transform → Generate → Emit
  *
- * This is the central coordinator that:
- * 1. Loads config
- * 2. Scans source files (Load)
- * 3. Transforms Markdown to HTML with article-level concurrency (Transform)
- * 4. Aggregates data and generates routes (Generate)
- * 5. Emits static HTML files (Emit)
+ * Phase 2 additions:
+ * - Collection registry for custom content types
+ * - Singleton registry for global data
+ * - IoC container + DAG scheduling for plugin dependencies
+ * - Dependency tracking for incremental builds
  */
 import path from 'node:path'
 import type {
@@ -25,6 +24,10 @@ import { createMarkdownProcessor, transformEntry } from './transformer.js'
 import { buildSiteData, generateRoutes } from './generator.js'
 import { emitRoutes } from './emitter.js'
 import { FileSystemCache } from './cache.js'
+import { CollectionRegistry } from './collection-registry.js'
+import { SingletonRegistry } from './singleton-registry.js'
+import { buildExecutionPlan, executePluginPlan } from './ioc.js'
+import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 
 export interface EngineOptions {
   /** Project root directory (absolute) */
@@ -41,6 +44,11 @@ export class Engine {
   private cache: FileSystemCache
   private noCache: boolean
 
+  // Phase 2 registries
+  readonly collections = new CollectionRegistry()
+  readonly singletons = new SingletonRegistry()
+  private depTracker: DependencyTracker
+
   // Pipeline stages
   readonly loadPipeline = new Pipeline<LoadContext>()
   readonly transformPipeline = new Pipeline<TransformContext>()
@@ -51,9 +59,11 @@ export class Engine {
     this.rootDir = options.rootDir
     this.config = options.config
     this.noCache = options.noCache ?? false
-    this.cache = new FileSystemCache(
-      path.join(this.rootDir, options.config.build.cacheDir),
-    )
+
+    const cacheDir = path.join(this.rootDir, options.config.build.cacheDir)
+    this.cache = new FileSystemCache(cacheDir)
+    this.singletons.setCacheDir(cacheDir)
+    this.depTracker = new DependencyTracker(cacheDir)
   }
 
   /**
@@ -62,17 +72,40 @@ export class Engine {
   async build(): Promise<BuildResult> {
     const startTime = Date.now()
 
-    // Initialize cache
+    // Initialize cache and dependency tracker
     if (!this.noCache) {
       await this.cache.init()
+      await this.depTracker.init()
     }
 
-    // Register plugin hooks
+    // ── Phase 2: Register plugin collections/singletons ──
+    this.registerPluginContent()
+
+    // ── Phase 2: IoC - build execution plan and validate ──
+    const plan = buildExecutionPlan(this.config.plugins)
+
+    // Register plugin hooks (respecting DAG order)
     this.registerPluginHooks()
+
+    // ── Phase 2: Resolve singletons ──
+    const singletonData = await this.singletons.resolveAll(this.rootDir)
+
+    // Record singleton hashes for dependency tracking
+    if (!this.noCache) {
+      for (const [name, data] of singletonData) {
+        this.depTracker.recordSingletonHash(name, hashData(data))
+      }
+    }
 
     // ── Stage 1: Load ──
     const sourceDir = path.join(this.rootDir, this.config.source)
     const loadContexts = await loadSourceFiles({ sourceDir })
+
+    // Load custom collection files
+    for (const def of this.collections.getAll()) {
+      const collectionContexts = await this.collections.loadFiles(def.name, this.rootDir)
+      loadContexts.push(...collectionContexts)
+    }
 
     // Run load pipeline on each context
     for (const ctx of loadContexts) {
@@ -117,10 +150,48 @@ export class Engine {
 
     // ── Stage 3: Generate ──
     const siteData = buildSiteData(entries)
+
+    // Inject singleton data into siteData
+    for (const [name, data] of singletonData) {
+      (siteData as any)[name] = data
+    }
+
     const routes = generateRoutes(siteData)
+
+    // Generate routes for custom collections
+    for (const def of this.collections.getAll()) {
+      const collectionEntries = entries.filter(e => e.contentType === def.name)
+      const collectionRoutes = this.collections.generateRoutes(def.name, collectionEntries)
+      routes.push(...collectionRoutes)
+    }
+
     const generateCtx: GenerateContext = { siteData, routes }
 
     await this.generatePipeline.run(generateCtx)
+
+    // Record dependency data
+    if (!this.noCache) {
+      // Record tag/category counts
+      const tagCounts: Record<string, number> = {}
+      for (const [slug, tag] of siteData.tags) tagCounts[slug] = tag.count
+      this.depTracker.recordTagCounts(tagCounts)
+
+      const catCounts: Record<string, number> = {}
+      for (const [slug, cat] of siteData.categories) catCounts[slug] = cat.count
+      this.depTracker.recordCategoryCounts(catCounts)
+
+      // Record per-entry dependencies
+      for (const entry of entries) {
+        const post = entry as any
+        this.depTracker.recordEntry(entry.id, {
+          fileHash: '', // already tracked by FileSystemCache
+          tagSlugs: (post.tags ?? []).map((t: any) => t.slug),
+          categorySlugs: (post.categories ?? []).map((c: any) => c.slug),
+          singletonNames: [], // TODO: track at access time
+          layoutName: '',
+        })
+      }
+    }
 
     // ── Stage 4: Emit ──
     const outDir = path.join(this.rootDir, this.config.build.outDir)
@@ -142,9 +213,10 @@ export class Engine {
       await this.emitPipeline.run(ctx)
     }
 
-    // Save cache manifest
+    // Save cache and dependency manifests
     if (!this.noCache) {
       await this.cache.saveManifest()
+      await this.depTracker.save()
     }
 
     const elapsed = Date.now() - startTime
@@ -165,6 +237,20 @@ export class Engine {
     const outDir = path.join(this.rootDir, this.config.build.outDir)
     const { rm } = await import('node:fs/promises')
     await rm(outDir, { recursive: true, force: true })
+  }
+
+  /**
+   * Register collections and singletons from plugins
+   */
+  private registerPluginContent(): void {
+    for (const plugin of this.config.plugins) {
+      for (const col of plugin.collections ?? []) {
+        this.collections.register(col)
+      }
+      for (const s of plugin.singletons ?? []) {
+        this.singletons.register(s)
+      }
+    }
   }
 
   /**
