@@ -38,3 +38,15 @@ export type {
   PluginHooks,
   UserConfig,
 } from './config.js'
+
+export type {
+  CollectionDefinition,
+  CollectionRoutes,
+  LocaleStrategy,
+} from './collection.js'
+export { defineCollection } from './collection.js'
+
+export type {
+  SingletonDefinition,
+} from './singleton.js'
+export { defineSingleton } from './singleton.js'

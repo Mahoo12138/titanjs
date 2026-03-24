@@ -62,10 +62,19 @@ export interface ThemeReference {
   config?: Record<string, unknown>
 }
 
-// ── Plugin Definition (Phase 1 minimal) ──
+// ── Plugin Definition (Phase 2) ──
 
 export interface PluginDefinition {
   name: string
+  /** Content type registrations */
+  collections?: import('./collection.js').CollectionDefinition[]
+  /** Singleton data registrations */
+  singletons?: import('./singleton.js').SingletonDefinition[]
+  /** IoC: data keys this plugin depends on */
+  inject?: string[]
+  /** IoC: data keys this plugin produces */
+  produces?: string[]
+  /** Pipeline hooks */
   hooks?: PluginHooks
 }
 
