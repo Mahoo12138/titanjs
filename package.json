@@ -1,45 +1,29 @@
 {
-  "name": "neo-hexo-monorepo",
-  "version": "0.0.0",
+  "name": "titan-monorepo",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Neo-Hexo: A modern static site generator, reimagined.",
+  "description": "Titan: A modern static site generator, reimagined.",
   "packageManager": "pnpm@10.6.2",
   "scripts": {
-    "build": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/server packages/theme packages/neo-hexo",
-    "clean": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/server packages/theme packages/neo-hexo --clean",
+    "build": "pnpm -r --filter='./packages/*' run build",
+    "dev": "pnpm -r --filter='./packages/*' run --parallel dev",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages/*/src/**/*.ts",
-    "typecheck": "tsc -b packages/core packages/fs packages/utils packages/database packages/front-matter packages/i18n packages/renderer-markdown packages/processor packages/generator packages/filter packages/helper packages/highlight packages/injector packages/renderer-edge packages/console packages/deployer-git packages/cli packages/server packages/theme packages/neo-hexo --noEmit"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/hexojs/hexo.git"
-  },
-  "homepage": "https://hexo.io/",
-  "funding": {
-    "type": "opencollective",
-    "url": "https://opencollective.com/hexo"
+    "clean": "pnpm -r run clean && rm -rf node_modules"
   },
   "keywords": [
     "website",
     "blog",
-    "cms",
+    "ssg",
     "framework",
-    "hexo"
-  ],
-  "author": "Tommy Chen <tommy351@gmail.com> (https://zespia.tw)",
-  "maintainers": [
-    "Abner Chou <hi@abnerchou.me> (https://abnerchou.me)"
+    "titan"
   ],
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.17.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
