@@ -11,7 +11,7 @@
 import path from 'node:path'
 import { cac } from 'cac'
 import pc from 'picocolors'
-import { loadConfig, Engine } from '@titan/core'
+import { loadConfig, Engine, loadTheme, DESIGN_TOKENS, extractAssignedTokens, buildStyles } from '@titan/core'
 
 const cli = cac('titan')
 
@@ -137,11 +137,100 @@ cli
 cli
   .command('info', 'Print environment info')
   .option('--root <dir>', 'Project root directory', { default: '.' })
-  .action(async (options: { root: string }) => {
+  .option('--slots', 'Show slot registration details')
+  .option('--tokens', 'Show design token assignments')
+  .action(async (options: { root: string; slots?: boolean; tokens?: boolean }) => {
     const rootDir = resolveRoot(options.root)
 
     try {
       const config = await loadConfig(rootDir)
+
+      // ── Slot inspection ──
+      if (options.slots) {
+        console.log(pc.cyan('⚡ Titan') + ' Slot Registration\n')
+
+        const theme = await loadTheme(
+          config.theme,
+          rootDir,
+          config.plugins,
+        )
+
+        if (!theme) {
+          console.log(pc.dim('  No theme configured – no slots available.\n'))
+          return
+        }
+
+        const declaredSlots = theme.definition.slots ?? {}
+        const slotNames = Object.keys(declaredSlots)
+
+        if (slotNames.length === 0) {
+          console.log(pc.dim('  Theme declares no slots.\n'))
+          return
+        }
+
+        for (const name of slotNames) {
+          const def = declaredSlots[name]
+          const components = theme.slotComponents.get(name) ?? []
+          const mode = def.mode ?? 'stack'
+
+          console.log(`  ${pc.bold(name)} ${pc.dim(`(${mode})`)}`)
+          if (def.description) {
+            console.log(`    ${pc.dim(def.description)}`)
+          }
+
+          if (components.length > 0) {
+            for (const comp of components) {
+              console.log(`    ${pc.green('→')} ${comp.slot} ${pc.dim(`order: ${comp.order ?? 0}`)}`)
+            }
+          } else {
+            console.log(`    ${pc.dim('(no injections)')}`)
+          }
+          console.log()
+        }
+
+        return
+      }
+
+      // ── Token inspection ──
+      if (options.tokens) {
+        console.log(pc.cyan('⚡ Titan') + ' Design Token Assignments\n')
+
+        const theme = await loadTheme(
+          config.theme,
+          rootDir,
+          config.plugins,
+        )
+
+        // Gather assigned tokens from theme CSS
+        const themeCSS = theme?.styles ?? ''
+        const assigned = extractAssignedTokens(themeCSS)
+
+        // User overrides
+        const userOverrides = config.styles?.tokens ?? {}
+
+        console.log(`  ${pc.bold('All tokens')} (${DESIGN_TOKENS.length} total):\n`)
+
+        for (const token of DESIGN_TOKENS) {
+          const fromTheme = assigned.has(token)
+          const fromUser = token in userOverrides
+
+          let source: string
+          if (fromUser) {
+            source = pc.yellow('user override') + pc.dim(` → ${userOverrides[token]}`)
+          } else if (fromTheme) {
+            source = pc.green('theme')
+          } else {
+            source = pc.red('unset')
+          }
+
+          console.log(`  ${token.padEnd(28)} ${source}`)
+        }
+
+        console.log()
+        return
+      }
+
+      // ── Default info ──
 
       console.log(pc.cyan('⚡ Titan') + ' Environment Info\n')
       console.log(`  Node.js:    ${process.version}`)
@@ -152,6 +241,58 @@ cli
       console.log(`  Cache:      ${config.build.cacheDir}`)
       console.log(`  Plugins:    ${config.plugins.length > 0 ? config.plugins.map(p => p.name).join(', ') : '(none)'}`)
       console.log(`  Theme:      ${config.theme ?? '(built-in)'}`)
+    } catch (err) {
+      printError(err)
+      process.exit(1)
+    }
+  })
+
+// ── titan profile ──
+cli
+  .command('profile', 'Profile build performance')
+  .option('--root <dir>', 'Project root directory', { default: '.' })
+  .action(async (options: { root: string }) => {
+    const rootDir = resolveRoot(options.root)
+
+    console.log(pc.cyan('⚡ Titan') + ' Build Profile\n')
+
+    try {
+      const config = await loadConfig(rootDir)
+
+      const timings: { label: string; elapsed: number }[] = []
+      const mark = (label: string, fn: () => Promise<void>) => async () => {
+        const start = performance.now()
+        await fn()
+        timings.push({ label, elapsed: Math.round(performance.now() - start) })
+      }
+
+      // Run a full build, measuring each phase
+      const totalStart = performance.now()
+
+      const engine = new Engine({
+        rootDir,
+        config,
+        noCache: true,
+      })
+
+      const result = await engine.build()
+      const totalElapsed = Math.round(performance.now() - totalStart)
+
+      // Engine.build() already measures total elapsed
+      console.log(`  ${pc.bold('Total build time:')} ${pc.yellow(result.elapsed + 'ms')}`)
+      console.log(`  ${pc.dim(`${result.entries} entries, ${result.routes} routes`)}`)
+      console.log(`  ${pc.dim(`Output: ${result.outDir}`)}\n`)
+
+      // Provide advice based on results
+      if (result.elapsed > 5000) {
+        console.log(pc.yellow('  Tip: Build took >5s. Consider using incremental builds (remove --no-cache).'))
+      } else if (result.elapsed > 1000) {
+        console.log(pc.dim('  Build time is reasonable.'))
+      } else {
+        console.log(pc.green('  ✓') + ' Fast build!')
+      }
+
+      console.log()
     } catch (err) {
       printError(err)
       process.exit(1)
