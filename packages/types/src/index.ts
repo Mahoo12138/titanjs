@@ -57,6 +57,7 @@ export type {
   SlotComponentDefinition,
   IslandDefinition,
   ResolvedTheme,
+  ResolvedStyleOutput,
   LayoutModule,
   SiteContext,
   PageContext,

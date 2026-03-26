@@ -72,8 +72,18 @@ export interface ResolvedTheme {
   typeLayoutMap: Record<string, string>
   /** Theme root directory */
   rootDir: string
-  /** Inlined CSS from the theme's style.css */
+  /** Inlined CSS from the theme's style.css (legacy, used as fallback) */
   styles?: string
+  /** Processed style layers from the 5-layer system */
+  resolvedStyles?: ResolvedStyleOutput
+}
+
+/** Output of the style system's buildStyles() */
+export interface ResolvedStyleOutput {
+  /** All layers merged into one CSS string */
+  css: string
+  /** Validation warnings (non-fatal) */
+  warnings: string[]
 }
 
 export interface LayoutModule {

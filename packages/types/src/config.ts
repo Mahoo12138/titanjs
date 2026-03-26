@@ -51,10 +51,12 @@ export interface MarkdownConfig {
 }
 
 export interface StyleConfig {
-  /** Design token overrides */
+  /** Design token overrides (--t-* values) */
   tokens: Record<string, string>
   /** Additional global CSS file path */
   global?: string
+  /** Dark mode strategy */
+  darkMode?: 'class' | 'media' | 'both'
 }
 
 export interface ThemeReference {
