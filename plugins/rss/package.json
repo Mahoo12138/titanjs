@@ -1,5 +1,5 @@
 {
-  "name": "@titan/plugin-reading-time",
+  "name": "@titan/plugin-rss",
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/index.js",
