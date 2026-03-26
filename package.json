@@ -20,9 +20,10 @@
     "titan"
   ],
   "license": "MIT",
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "preact": "^10.29.1",
+    "preact-render-to-string": "^6.6.7",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
