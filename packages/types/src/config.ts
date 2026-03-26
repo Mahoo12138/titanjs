@@ -76,6 +76,8 @@ export interface PluginDefinition {
   produces?: string[]
   /** Pipeline hooks */
   hooks?: PluginHooks
+  /** Theme slot components (Phase 3) */
+  slotComponents?: import('./theme.js').SlotComponentDefinition[]
 }
 
 export interface PluginHooks {

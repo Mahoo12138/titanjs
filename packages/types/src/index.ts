@@ -50,3 +50,19 @@ export type {
   SingletonDefinition,
 } from './singleton.js'
 export { defineSingleton } from './singleton.js'
+
+export type {
+  ThemeDefinition,
+  SlotDefinition,
+  SlotComponentDefinition,
+  IslandDefinition,
+  ResolvedTheme,
+  LayoutModule,
+  SiteContext,
+  PageContext,
+  PostContext,
+  PageLayoutContext,
+  ListContext,
+  CollectionItemContext,
+} from './theme.js'
+export { defineTheme, defineSlot, defineSlotComponent } from './theme.js'
