@@ -28,3 +28,22 @@ export { renderLayout, Slot, buildHtmlDocument } from './renderer.js'
 export type { IslandInstance, RenderResult } from './renderer.js'
 export { emitRoutesWithTheme } from './theme-emitter.js'
 export type { ThemeEmitterOptions } from './theme-emitter.js'
+
+// Phase 4 - Style system
+export {
+  buildStyles,
+  loadFrameworkBase,
+  loadThemeGlobalStyles,
+  validateTokenCompleteness,
+  lintPluginCSS,
+  scopeCSS,
+  extractAssignedTokens,
+  generateUserTokenOverrides,
+  DESIGN_TOKENS,
+} from './styles.js'
+export type {
+  StyleLayers,
+  ResolvedStyles,
+  CSSLintViolation,
+  BuildStylesOptions,
+} from './styles.js'

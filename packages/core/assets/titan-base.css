@@ -1,0 +1,76 @@
+/*
+ * Titan Framework Base Layer (Layer 1)
+ *
+ * Minimal CSS reset + Design Token declarations.
+ * Theme MUST assign values to all --t-* tokens.
+ * Plugins MUST only reference --t-* tokens (read-only).
+ *
+ * Namespace convention:
+ *   --titan-*   Framework internal (theme & plugins must NOT use)
+ *   --t-*       Design Tokens (theme assigns, plugins read)
+ */
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+img, video, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; }
+
+/* ── Design Token Declarations ── */
+:root {
+  /* Colors */
+  --t-color-bg:           ;
+  --t-color-bg-subtle:    ;
+  --t-color-surface:      ;
+  --t-color-border:       ;
+  --t-color-text:         ;
+  --t-color-text-muted:   ;
+  --t-color-accent:       ;
+  --t-color-accent-hover: ;
+  --t-color-code-bg:      ;
+  --t-color-tag-bg:       ;
+  --t-color-tag-text:     ;
+
+  /* Typography */
+  --t-font-sans:          ;
+  --t-font-mono:          ;
+  --t-font-serif:         ;
+  --t-text-xs:            ;
+  --t-text-sm:            ;
+  --t-text-base:          ;
+  --t-text-lg:            ;
+  --t-text-xl:            ;
+  --t-text-2xl:           ;
+  --t-text-3xl:           ;
+  --t-leading-tight:      ;
+  --t-leading-normal:     ;
+  --t-leading-relaxed:    ;
+
+  /* Spacing */
+  --t-space-1:            ;
+  --t-space-2:            ;
+  --t-space-4:            ;
+  --t-space-6:            ;
+  --t-space-8:            ;
+  --t-space-12:           ;
+  --t-space-16:           ;
+
+  /* Borders & Shadows */
+  --t-radius-sm:          ;
+  --t-radius-md:          ;
+  --t-radius-lg:          ;
+  --t-radius-full:        ;
+  --t-shadow-sm:          ;
+  --t-shadow-md:          ;
+  --t-shadow-lg:          ;
+
+  /* Z-Index */
+  --t-z-base:             ;
+  --t-z-dropdown:         ;
+  --t-z-modal:            ;
+  --t-z-toast:            ;
+
+  /* Layout */
+  --t-max-width:          ;
+  --t-header-height:      ;
+}

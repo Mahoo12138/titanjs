@@ -31,7 +31,7 @@ export async function emitRoutes(
     const html = renderRoute(route, siteData, options.siteConfig)
     const outputPath = path.join(options.outDir, route.outputPath)
 
-    // Ensure directory exists
+    // Write output
     await fs.mkdir(path.dirname(outputPath), { recursive: true })
     await fs.writeFile(outputPath, html, 'utf-8')
 

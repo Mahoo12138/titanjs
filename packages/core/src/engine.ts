@@ -10,6 +10,7 @@
  * - Dependency tracking for incremental builds
  */
 import path from 'node:path'
+import fs from 'node:fs/promises'
 import type {
   TitanConfig,
   BaseEntry,
@@ -31,6 +32,7 @@ import { CollectionRegistry } from './collection-registry.js'
 import { SingletonRegistry } from './singleton-registry.js'
 import { buildExecutionPlan, executePluginPlan } from './ioc.js'
 import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
+import { buildStyles } from './styles.js'
 
 export interface EngineOptions {
   /** Project root directory (absolute) */
@@ -203,6 +205,35 @@ export class Engine {
       this.config.plugins,
     )
 
+    // ── Phase 4: Build styles ──
+    if (theme) {
+      const resolvedStyles = await buildStyles({
+        themeDir: theme.rootDir,
+        themeName: theme.definition.name,
+        plugins: [],  // Plugin slot styles collected at build time
+        userStyles: this.config.styles?.tokens || this.config.styles?.global
+          ? {
+              tokens: this.config.styles.tokens,
+              global: this.config.styles.global,
+            }
+          : undefined,
+        rootDir: this.rootDir,
+      })
+
+      // Log style warnings
+      for (const warning of resolvedStyles.warnings) {
+        console.warn(`[style] ${warning}`)
+      }
+
+      // Attach resolved styles to theme
+      theme.resolvedStyles = {
+        css: resolvedStyles.css,
+        warnings: resolvedStyles.warnings,
+      }
+      // Also set the legacy styles field for backward compat
+      theme.styles = resolvedStyles.css
+    }
+
     // ── Stage 4: Emit ──
     const outDir = path.join(this.rootDir, this.config.build.outDir)
     const siteConfig = {
@@ -223,9 +254,15 @@ export class Engine {
           { outDir, siteConfig },
         )
 
-    // Run emit pipeline on each context
+    // Run emit pipeline on each context, then re-write if modified
     for (const ctx of emitContexts) {
+      const originalHtml = ctx.html
       await this.emitPipeline.run(ctx)
+      // If a plugin modified ctx.html, re-write the file
+      if (ctx.html !== originalHtml) {
+        await fs.mkdir(path.dirname(ctx.outputPath), { recursive: true })
+        await fs.writeFile(ctx.outputPath, ctx.html, 'utf-8')
+      }
     }
 
     // Save cache and dependency manifests
