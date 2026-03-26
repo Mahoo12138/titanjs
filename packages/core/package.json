@@ -10,7 +10,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -19,7 +21,10 @@
   "dependencies": {
     "@titan/types": "workspace:*",
     "chokidar": "^4.0.0",
+    "esbuild": "^0.28.0",
     "gray-matter": "^4.0.3",
+    "preact": "^10.29.1",
+    "preact-render-to-string": "^6.6.7",
     "rehype-stringify": "^10.0.0",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.0.0",

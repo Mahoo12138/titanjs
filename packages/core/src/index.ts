@@ -21,3 +21,10 @@ export { buildExecutionPlan, executePluginPlan } from './ioc.js'
 export type { PluginNode, ExecutionPlan } from './ioc.js'
 export { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 export type { EntryDependencies, DependencyManifest } from './dependency-tracker.js'
+
+// Phase 3 - Theme system
+export { loadTheme, resolveLayout } from './theme-loader.js'
+export { renderLayout, Slot, buildHtmlDocument } from './renderer.js'
+export type { IslandInstance, RenderResult } from './renderer.js'
+export { emitRoutesWithTheme } from './theme-emitter.js'
+export type { ThemeEmitterOptions } from './theme-emitter.js'

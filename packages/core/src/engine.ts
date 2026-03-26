@@ -17,12 +17,15 @@ import type {
   TransformContext,
   GenerateContext,
   EmitContext,
+  ResolvedTheme,
 } from '@titan/types'
 import { Pipeline } from './pipeline.js'
 import { loadSourceFiles, loadFile } from './loader.js'
 import { createMarkdownProcessor, transformEntry } from './transformer.js'
 import { buildSiteData, generateRoutes } from './generator.js'
 import { emitRoutes } from './emitter.js'
+import { emitRoutesWithTheme } from './theme-emitter.js'
+import { loadTheme } from './theme-loader.js'
 import { FileSystemCache } from './cache.js'
 import { CollectionRegistry } from './collection-registry.js'
 import { SingletonRegistry } from './singleton-registry.js'
@@ -193,20 +196,32 @@ export class Engine {
       }
     }
 
+    // ── Phase 3: Load theme ──
+    const theme = await loadTheme(
+      this.config.theme,
+      this.rootDir,
+      this.config.plugins,
+    )
+
     // ── Stage 4: Emit ──
     const outDir = path.join(this.rootDir, this.config.build.outDir)
-    const emitContexts = await emitRoutes(
-      generateCtx.routes,
-      generateCtx.siteData,
-      {
-        outDir,
-        siteConfig: {
-          title: this.config.title,
-          url: this.config.url,
-          language: this.config.language,
-        },
-      },
-    )
+    const siteConfig = {
+      title: this.config.title,
+      url: this.config.url,
+      language: this.config.language,
+    }
+
+    const emitContexts = theme
+      ? await emitRoutesWithTheme(
+          generateCtx.routes,
+          generateCtx.siteData,
+          { outDir, siteConfig, theme },
+        )
+      : await emitRoutes(
+          generateCtx.routes,
+          generateCtx.siteData,
+          { outDir, siteConfig },
+        )
 
     // Run emit pipeline on each context
     for (const ctx of emitContexts) {
