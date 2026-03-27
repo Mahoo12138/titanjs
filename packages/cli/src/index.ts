@@ -82,6 +82,7 @@ cli
       const server = createServer(async (req, res) => {
         let urlPath = req.url || '/'
         urlPath = urlPath.split('?')[0]
+        try { urlPath = decodeURIComponent(urlPath) } catch { /* malformed URI — keep as-is */ }
         if (urlPath.endsWith('/')) urlPath += 'index.html'
         if (!extname(urlPath)) urlPath += '/index.html'
 
