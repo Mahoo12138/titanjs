@@ -1,19 +1,26 @@
 {
-  "name": "neo-hexo-example",
+  "name": "titan-example",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Example Neo-Hexo blog site — demonstrates the framework in action.",
   "scripts": {
-    "build": "neo-hexo generate",
-    "serve": "neo-hexo server",
-    "clean": "neo-hexo clean",
-    "new": "neo-hexo new post"
+    "dev": "titan dev",
+    "build": "titan build",
+    "clean": "titan clean"
   },
   "dependencies": {
-    "neo-hexo": "workspace:*"
-  },
-  "engines": {
-    "node": ">=22.0.0"
+    "@titan/cli": "workspace:*",
+    "@titan/core": "workspace:*",
+    "@titan/plugin-sitemap": "workspace:*",
+    "@titan/plugin-rss": "workspace:*",
+    "@titan/plugin-reading-time": "workspace:*",
+    "@titan/plugin-toc": "workspace:*",
+    "@titan/plugin-wiki": "workspace:*",
+    "@titan/plugin-notebooks": "workspace:*",
+    "@titan/plugin-tag-plugins": "workspace:*",
+    "@titan/plugin-comments": "workspace:*",
+    "@titan/plugin-search": "workspace:*",
+    "titan-theme-stellar": "workspace:*",
+    "preact": "^10.29.1"
   }
 }

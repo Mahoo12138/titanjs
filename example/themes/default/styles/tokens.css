@@ -1,0 +1,81 @@
+/*
+ * Titan Default Theme — Design Tokens
+ *
+ * Assigns values to the framework's --t-* design token system.
+ * All tokens declared in titan-base.css are given concrete values here.
+ */
+
+:root {
+  /* Colors — Light Mode */
+  --t-color-bg:           #fafaf9;
+  --t-color-bg-subtle:    #f5f5f4;
+  --t-color-surface:      #ffffff;
+  --t-color-border:       #e7e5e4;
+  --t-color-text:         #1c1917;
+  --t-color-text-muted:   #78716c;
+  --t-color-accent:       #2563eb;
+  --t-color-accent-hover: #1d4ed8;
+  --t-color-code-bg:      #f5f5f4;
+  --t-color-tag-bg:       #eff6ff;
+  --t-color-tag-text:     #2563eb;
+
+  /* Typography */
+  --t-font-sans:   'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --t-font-mono:   'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --t-font-serif:  'Noto Serif SC', 'Source Han Serif SC', serif;
+  --t-text-xs:     0.75rem;
+  --t-text-sm:     0.875rem;
+  --t-text-base:   1rem;
+  --t-text-lg:     1.125rem;
+  --t-text-xl:     1.25rem;
+  --t-text-2xl:    1.5rem;
+  --t-text-3xl:    1.875rem;
+  --t-leading-tight:   1.25;
+  --t-leading-normal:  1.5;
+  --t-leading-relaxed: 1.75;
+
+  /* Spacing */
+  --t-space-1:   0.25rem;
+  --t-space-2:   0.5rem;
+  --t-space-4:   1rem;
+  --t-space-6:   1.5rem;
+  --t-space-8:   2rem;
+  --t-space-12:  3rem;
+  --t-space-16:  4rem;
+
+  /* Borders & Shadows */
+  --t-radius-sm:   4px;
+  --t-radius-md:   8px;
+  --t-radius-lg:   16px;
+  --t-radius-full: 9999px;
+  --t-shadow-sm:   0 1px 2px rgba(0,0,0,0.04);
+  --t-shadow-md:   0 4px 12px rgba(0,0,0,0.06);
+  --t-shadow-lg:   0 10px 20px rgba(0,0,0,0.08);
+
+  /* Z-Index */
+  --t-z-base:     0;
+  --t-z-dropdown: 100;
+  --t-z-modal:    200;
+  --t-z-toast:    300;
+
+  /* Layout */
+  --t-max-width:     720px;
+  --t-header-height: 64px;
+}
+
+/* Dark Mode — Only override color tokens */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --t-color-bg:           #0c0a09;
+    --t-color-bg-subtle:    #1c1917;
+    --t-color-surface:      #1c1917;
+    --t-color-border:       #292524;
+    --t-color-text:         #e7e5e4;
+    --t-color-text-muted:   #a8a29e;
+    --t-color-accent:       #60a5fa;
+    --t-color-accent-hover: #93c5fd;
+    --t-color-code-bg:      #1c1917;
+    --t-color-tag-bg:       #172554;
+    --t-color-tag-text:     #60a5fa;
+  }
+}
