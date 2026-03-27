@@ -1,0 +1,35 @@
+{
+  "name": "@titan/plugin-tag-plugins",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./css": "./src/tag-plugins.css"
+  },
+  "files": ["dist", "src/tag-plugins.css"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@titan/types": "workspace:*",
+    "remark-directive": "^3.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "unified": "^11.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.0.0",
+    "rehype-stringify": "^10.0.0",
+    "vitest": "^3.0.0"
+  }
+}
