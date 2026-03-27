@@ -1,5 +1,8 @@
 // @titan/types - Shared type definitions for Titan SSG
 
+// JSX custom-element support (catch-all for arbitrary HTML element names in JSX)
+import './jsx-custom-elements.js'
+
 export type {
   Middleware,
   Pipeline,
@@ -50,6 +53,19 @@ export type {
   SingletonDefinition,
 } from './singleton.js'
 export { defineSingleton } from './singleton.js'
+
+export type {
+  WidgetDefinition,
+  WidgetContext,
+  WidgetSiteContext,
+  WidgetDataLoaderContext,
+  SidebarConfig,
+  LayoutSidebarConfig,
+  SiteTree,
+  WidgetsConfig,
+  WidgetMap,
+} from './widget.js'
+export { defineWidget } from './widget.js'
 
 export type {
   ThemeDefinition,

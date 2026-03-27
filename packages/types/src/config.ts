@@ -59,7 +59,22 @@ export interface StyleConfig {
   darkMode?: 'class' | 'media' | 'both'
 }
 
-export interface ThemeReference {
+/**
+ * Theme reference — supports multiple resolution strategies:
+ *
+ * **String shorthand:**
+ * - Relative/absolute path: `'../themes/stellar'`, `'./my-theme'`
+ * - Short name (convention): `'stellar'` → tries `themes/stellar/`, then
+ *   `titan-theme-stellar` and `@titan/theme-stellar` in node_modules
+ * - Full npm package: `'titan-theme-stellar'`, `'@titan/theme-stellar'`,
+ *   `'@my-org/my-theme'`
+ *
+ * **Object form** (with theme config overrides):
+ * ```js
+ * theme: { name: 'stellar', config: { primaryColor: '#f00' } }
+ * ```
+ */
+export type ThemeReference = {
   name: string
   config?: Record<string, unknown>
 }
@@ -80,6 +95,12 @@ export interface PluginDefinition {
   hooks?: PluginHooks
   /** Theme slot components (Phase 3) */
   slotComponents?: import('./theme.js').SlotComponentDefinition[]
+  /** Additional remark plugins to inject into the Markdown pipeline (Phase 4) */
+  remarkPlugins?: unknown[]
+  /** Additional rehype plugins to inject into the Markdown pipeline (Phase 4) */
+  rehypePlugins?: unknown[]
+  /** Global CSS to inject into every page (unscoped, for generated class names) */
+  globalStyles?: string
 }
 
 export interface PluginHooks {

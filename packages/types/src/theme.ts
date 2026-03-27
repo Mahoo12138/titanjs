@@ -11,6 +11,7 @@
 import type { z } from 'zod'
 import type { BaseEntry, Post, Page, SiteData, Collection, Tag, Category, Heading } from './content.js'
 import type { Route, Pagination } from './route.js'
+import type { WidgetDefinition, SiteTree, WidgetsConfig } from './widget.js'
 
 // ── Theme Definition ──
 
@@ -25,6 +26,12 @@ export interface ThemeDefinition {
   viewTransitions?: boolean
   /** Content type → layout name mapping */
   typeLayoutMap?: Record<string, string>
+  /** Widget definitions provided by this theme */
+  widgets?: WidgetDefinition<any>[]
+  /** SiteTree: per-layout sidebar widget configuration */
+  siteTree?: SiteTree
+  /** Default widget instance configs */
+  widgetsConfig?: WidgetsConfig
 }
 
 // ── Slot System ──
