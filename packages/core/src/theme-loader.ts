@@ -47,9 +47,6 @@ export async function loadTheme(
 
   // Resolve theme directory
   const themeDir = await resolveThemeDir(themeName, rootDir)
-  if (!themeDir) {
-    throw new Error(`Theme "${themeName}" not found. Looked for local directory and node_modules package.`)
-  }
 
   // Load theme definition
   const importFn = importer ?? defaultImport
@@ -130,58 +127,104 @@ export function resolveLayout(
 }
 
 /**
- * Resolve theme directory from name
+ * Resolve theme directory from name, using multi-strategy resolution:
+ *
+ * 1. Relative / absolute path  (starts with `.` or `/` or Windows drive letter)
+ * 2. Local `themes/{name}/` directory under project root
+ * 3. npm package — exact name   (e.g. `titan-theme-stellar`)
+ * 4. npm package — convention   `titan-theme-{name}`
+ * 5. npm package — scoped       `@titan/theme-{name}`
  */
 async function resolveThemeDir(
   themeName: string,
   rootDir: string,
-): Promise<string | null> {
-  // Try local directory first (e.g. "./themes/my-theme")
-  if (themeName.startsWith('.') || themeName.startsWith('/')) {
+): Promise<string> {
+  const tried: string[] = []
+
+  // ── Strategy 1: explicit relative / absolute path ──
+  const isPath = themeName.startsWith('.') || themeName.startsWith('/')
+    || /^[A-Za-z]:[\\/]/.test(themeName) // Windows absolute path
+  if (isPath) {
     const localDir = path.resolve(rootDir, themeName)
+    tried.push(`path: ${localDir}`)
     if (await exists(localDir)) return localDir
-    return null
+    // If user gave an explicit path, don't fall through to other strategies
+    throw new Error(
+      `Theme path "${themeName}" resolved to "${localDir}" but the directory does not exist.`,
+    )
   }
 
-  // Try themes/ subdirectory
+  // ── Strategy 2: local themes/ directory ──
   const themesDir = path.join(rootDir, 'themes', themeName)
+  tried.push(`local: ${themesDir}`)
   if (await exists(themesDir)) return themesDir
 
-  // Try node_modules (package name like @titan/theme-default)
-  try {
-    const packageJsonPath = require.resolve(`${themeName}/package.json`, {
-      paths: [rootDir],
-    })
-    return path.dirname(packageJsonPath)
-  } catch {
-    // Not found in node_modules
+  // ── Strategies 3-5: npm packages ──
+  // Build candidate list — the exact name first, then conventional names
+  const candidates = [themeName]
+  // Only add convention names if the input doesn't already look like a package
+  // (i.e., doesn't start with @ and doesn't already contain 'titan-theme-')
+  if (!themeName.startsWith('@') && !themeName.startsWith('titan-theme-')) {
+    candidates.push(`titan-theme-${themeName}`)
+    candidates.push(`@titan/theme-${themeName}`)
   }
 
+  for (const candidate of candidates) {
+    const resolved = await resolveNpmPackageDir(candidate, rootDir)
+    tried.push(`npm: ${candidate}`)
+    if (resolved) return resolved
+  }
+
+  throw new Error(
+    `Theme "${themeName}" not found. Tried:\n` +
+    tried.map((t) => `  - ${t}`).join('\n') +
+    '\n\nHint: install it (e.g. pnpm add titan-theme-stellar) ' +
+    'or place it in the themes/ directory.',
+  )
+}
+
+/**
+ * Resolve a package directory from node_modules using ESM-compatible resolution.
+ */
+async function resolveNpmPackageDir(
+  packageName: string,
+  rootDir: string,
+): Promise<string | null> {
+  // Use createRequire for reliable package resolution from any rootDir
+  const { createRequire } = await import('node:module')
+  const localRequire = createRequire(path.join(rootDir, 'package.json'))
+  try {
+    const packageJsonPath = localRequire.resolve(`${packageName}/package.json`)
+    return path.dirname(packageJsonPath)
+  } catch {
+    // Not installed
+  }
   return null
 }
 
 /**
  * Default module importer using dynamic import.
- * For .jsx/.tsx/.ts files, transpile with esbuild first since Node can't import them natively.
+ * For .jsx/.tsx/.ts/.mjs files, bundle with esbuild first since Node can't import them natively
+ * and local imports (e.g. ".js" → ".tsx") must be resolved by esbuild.
  */
 async function defaultImport(filePath: string): Promise<any> {
   const ext = path.extname(filePath)
-  if (['.jsx', '.tsx', '.ts'].includes(ext)) {
-    const { transform } = await import('esbuild')
-    const { readFile, writeFile, unlink } = await import('node:fs/promises')
-    const source = await readFile(filePath, 'utf-8')
-    const result = await transform(source, {
-      loader: ext.slice(1) as 'jsx' | 'tsx' | 'ts',
-      format: 'esm',
-      jsx: 'automatic',
-      jsxImportSource: 'preact',
-      target: 'es2022',
-      sourcefile: filePath,
-    })
-    // Write transpiled code next to the original file as .tmp.mjs
+  if (['.jsx', '.tsx', '.ts', '.mjs'].includes(ext)) {
+    const { build } = await import('esbuild')
+    const { unlink } = await import('node:fs/promises')
     const tmpFile = filePath + '.tmp.mjs'
-    await writeFile(tmpFile, result.code, 'utf-8')
     try {
+      await build({
+        entryPoints: [filePath],
+        outfile: tmpFile,
+        bundle: true,
+        format: 'esm',
+        jsx: 'automatic',
+        jsxImportSource: 'preact',
+        target: 'es2022',
+        // Keep node_modules as external; only bundle local source files
+        packages: 'external',
+      })
       // Bust import cache with query string
       const url = pathToFileURL(tmpFile).href + '?t=' + Date.now()
       return await import(url)

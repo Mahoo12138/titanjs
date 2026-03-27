@@ -11,6 +11,7 @@
  */
 import path from 'node:path'
 import fs from 'node:fs/promises'
+import crypto from 'node:crypto'
 import type {
   TitanConfig,
   BaseEntry,
@@ -23,13 +24,14 @@ import type {
 import { Pipeline } from './pipeline.js'
 import { loadSourceFiles, loadFile } from './loader.js'
 import { createMarkdownProcessor, transformEntry } from './transformer.js'
-import { buildSiteData, generateRoutes } from './generator.js'
+import { buildSiteData, generateRoutes, createCollection } from './generator.js'
 import { emitRoutes } from './emitter.js'
 import { emitRoutesWithTheme } from './theme-emitter.js'
 import { loadTheme } from './theme-loader.js'
 import { FileSystemCache } from './cache.js'
 import { CollectionRegistry } from './collection-registry.js'
 import { SingletonRegistry } from './singleton-registry.js'
+import { WidgetRegistry } from './widget-registry.js'
 import { buildExecutionPlan, executePluginPlan } from './ioc.js'
 import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 import { buildStyles } from './styles.js'
@@ -52,6 +54,7 @@ export class Engine {
   // Phase 2 registries
   readonly collections = new CollectionRegistry()
   readonly singletons = new SingletonRegistry()
+  readonly widgets = new WidgetRegistry()
   private depTracker: DependencyTracker
 
   // Pipeline stages
@@ -83,7 +86,7 @@ export class Engine {
       await this.depTracker.init()
     }
 
-    // ── Phase 2: Register plugin collections/singletons ──
+    // ── Phase 2: Register plugin collections/singletons/widgets ──
     this.registerPluginContent()
 
     // ── Phase 2: IoC - build execution plan and validate ──
@@ -108,7 +111,7 @@ export class Engine {
 
     // Load custom collection files
     for (const def of this.collections.getAll()) {
-      const collectionContexts = await this.collections.loadFiles(def.name, this.rootDir)
+      const collectionContexts = await this.collections.loadFiles(def.name, sourceDir)
       loadContexts.push(...collectionContexts)
     }
 
@@ -118,7 +121,39 @@ export class Engine {
     }
 
     // ── Stage 2: Transform (article-level concurrency) ──
-    const processor = createMarkdownProcessor(this.config.markdown)
+    // Collect remarkPlugins / rehypePlugins from all registered plugins
+    const mergedMarkdown = { ...this.config.markdown }
+    const extraRemark: unknown[] = []
+    const extraRehype: unknown[] = []
+    for (const plugin of this.config.plugins) {
+      if (plugin.remarkPlugins) extraRemark.push(...plugin.remarkPlugins)
+      if (plugin.rehypePlugins) extraRehype.push(...plugin.rehypePlugins)
+    }
+    mergedMarkdown.remarkPlugins = [
+      ...extraRemark,
+      ...(mergedMarkdown.remarkPlugins ?? []),
+    ]
+    mergedMarkdown.rehypePlugins = [
+      ...extraRehype,
+      ...(mergedMarkdown.rehypePlugins ?? []),
+    ]
+
+    // Compute a pipeline fingerprint so the cache is invalidated when plugins change
+    if (!this.noCache) {
+      const serializePlugins = (plugins: unknown[]) =>
+        plugins.map(p =>
+          Array.isArray(p)
+            ? p.map(item => (typeof item === 'function' ? item.name : String(item))).join('+')
+            : (typeof p === 'function' ? p.name : String(p))
+        ).join(',')
+      const pipelineStr =
+        serializePlugins(mergedMarkdown.remarkPlugins ?? []) + '|' +
+        serializePlugins(mergedMarkdown.rehypePlugins ?? [])
+      const pipelineHash = crypto.createHash('sha256').update(pipelineStr).digest('hex').slice(0, 16)
+      this.cache.setPipelineHash(pipelineHash)
+    }
+
+    const processor = createMarkdownProcessor(mergedMarkdown)
     const concurrency = this.config.build.concurrency
     const entries: BaseEntry[] = []
 
@@ -166,6 +201,8 @@ export class Engine {
     // Generate routes for custom collections
     for (const def of this.collections.getAll()) {
       const collectionEntries = entries.filter(e => e.contentType === def.name)
+      // Inject custom collection into siteData so layouts can find entries
+      ;(siteData as any)[def.name] = createCollection(def.name, collectionEntries)
       const collectionRoutes = this.collections.generateRoutes(def.name, collectionEntries)
       routes.push(...collectionRoutes)
     }
@@ -205,12 +242,31 @@ export class Engine {
       this.config.plugins,
     )
 
+    // Register theme widgets into WidgetRegistry
+    if (theme?.definition.widgets) {
+      this.widgets.registerAll(theme.definition.widgets)
+    }
+    if (theme?.definition.siteTree) {
+      this.widgets.setSiteTree(theme.definition.siteTree)
+    }
+    if (theme?.definition.widgetsConfig) {
+      this.widgets.setWidgetsConfig(theme.definition.widgetsConfig)
+    }
+    // Attach widget registry to theme for renderer access
+    if (theme) {
+      ;(theme as any).widgetRegistry = this.widgets
+    }
+
     // ── Phase 4: Build styles ──
     if (theme) {
       const resolvedStyles = await buildStyles({
         themeDir: theme.rootDir,
         themeName: theme.definition.name,
-        plugins: [],  // Plugin slot styles collected at build time
+        plugins: this.config.plugins.map(p => ({
+          name: p.name,
+          globalStyles: p.globalStyles,
+          slotStyles: undefined,  // slot styles collected from slot components in future
+        })),
         userStyles: this.config.styles?.tokens || this.config.styles?.global
           ? {
               tokens: this.config.styles.tokens,

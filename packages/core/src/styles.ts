@@ -415,8 +415,8 @@ export interface BuildStylesOptions {
   themeDir: string
   /** Theme name (for scoping & error messages) */
   themeName: string
-  /** Plugins with slot components */
-  plugins: Array<{ name: string; slotStyles?: string }>
+  /** Plugins with slot components and/or global styles */
+  plugins: Array<{ name: string; slotStyles?: string; globalStyles?: string }>
   /** User style config */
   userStyles?: {
     tokens?: Record<string, string>
@@ -450,6 +450,10 @@ export async function buildStyles(options: BuildStylesOptions): Promise<Resolved
   // Layer 4: Plugin components
   const pluginParts: string[] = []
   for (const plugin of plugins) {
+    // Unscoped global styles (e.g. tag plugin CSS with hardcoded class names)
+    if (plugin.globalStyles) {
+      pluginParts.push(`/* Plugin (global): ${plugin.name} */\n${plugin.globalStyles}`)
+    }
     if (!plugin.slotStyles) continue
     // Lint plugin CSS
     const violations = lintPluginCSS(plugin.slotStyles, plugin.name)

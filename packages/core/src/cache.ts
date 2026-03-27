@@ -24,11 +24,25 @@ export class FileSystemCache {
   private entriesDir: string
   private manifestPath: string
   private manifest: CacheManifest = {}
+  private pipelineHash: string = ''
 
   constructor(cacheDir: string) {
     this.cacheDir = cacheDir
     this.entriesDir = path.join(cacheDir, 'entries')
     this.manifestPath = path.join(cacheDir, 'manifest.json')
+  }
+
+  /**
+   * Set the pipeline hash (hash of remarkPlugins / rehypePlugins).
+   * If the pipeline changed since last run, all cached entries are invalidated.
+   */
+  setPipelineHash(hash: string): void {
+    this.pipelineHash = hash
+    const stored = this.manifest['_pipeline'] ?? ''
+    if (stored !== hash) {
+      // Pipeline changed — drop all file entries but keep _pipeline key
+      this.manifest = { '_pipeline': hash }
+    }
   }
 
   /**
@@ -81,8 +95,9 @@ export class FileSystemCache {
     await fs.writeFile(tmpPath, JSON.stringify(entry), 'utf-8')
     await fs.rename(tmpPath, entryPath)
 
-    // Update manifest
+    // Update manifest (always persist pipeline hash alongside file entries)
     this.manifest[filePath] = hash
+    if (this.pipelineHash) this.manifest['_pipeline'] = this.pipelineHash
   }
 
   /**

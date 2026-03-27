@@ -155,6 +155,20 @@ ${islandScripts}
 }
 
 /**
+ * Safely serialize a value to JSON, dropping circular references.
+ */
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet()
+  return JSON.stringify(value, (_key, val) => {
+    if (typeof val === 'object' && val !== null) {
+      if (seen.has(val)) return undefined
+      seen.add(val)
+    }
+    return val
+  }) ?? '{}'
+}
+
+/**
  * Generate island activation scripts
  */
 function generateIslandScripts(islands: IslandInstance[]): string {
@@ -168,7 +182,7 @@ function generateIslandScripts(islands: IslandInstance[]): string {
   const el = document.querySelector('[data-titan-island="${island.id}"]');
   if (el) {
     const { default: Comp } = await import('/assets/islands/${island.name}.js');
-    hydrate(Comp(${JSON.stringify(island.props ?? {})}), el);
+    hydrate(Comp(${safeStringify(island.props ?? {})}), el);
   }
 </script>`
 
@@ -180,7 +194,7 @@ function generateIslandScripts(islands: IslandInstance[]): string {
       if (entry.isIntersecting) {
         const { default: Comp } = await import('/assets/islands/${island.name}.js');
         const { hydrate } = await import('preact');
-        hydrate(Comp(${JSON.stringify(island.props ?? {})}), el);
+        hydrate(Comp(${safeStringify(island.props ?? {})}), el);
         observer.disconnect();
       }
     });
@@ -195,7 +209,7 @@ function generateIslandScripts(islands: IslandInstance[]): string {
     const cb = async () => {
       const { default: Comp } = await import('/assets/islands/${island.name}.js');
       const { hydrate } = await import('preact');
-      hydrate(Comp(${JSON.stringify(island.props ?? {})}), el);
+      hydrate(Comp(${safeStringify(island.props ?? {})}), el);
     };
     'requestIdleCallback' in window ? requestIdleCallback(cb) : setTimeout(cb, 200);
   }

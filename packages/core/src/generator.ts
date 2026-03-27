@@ -145,6 +145,36 @@ export function generateRoutes(siteData: SiteData): Route[] {
     })
   }
 
+  // Archive route
+  routes.push({
+    path: '/archives',
+    url: '/archives/',
+    contentType: 'post',
+    layout: 'archive',
+    outputPath: 'archives/index.html',
+    type: 'list',
+  })
+
+  // Tags index route
+  routes.push({
+    path: '/tags',
+    url: '/tags/',
+    contentType: 'tag',
+    layout: 'tags',
+    outputPath: 'tags/index.html',
+    type: 'list',
+  })
+
+  // Categories index route
+  routes.push({
+    path: '/categories',
+    url: '/categories/',
+    contentType: 'category',
+    layout: 'categories',
+    outputPath: 'categories/index.html',
+    type: 'list',
+  })
+
   return routes
 }
 
@@ -160,7 +190,7 @@ export function buildGenerateContext(entries: BaseEntry[]): GenerateContext {
 /**
  * Create a Collection wrapper with query methods
  */
-function createCollection<T extends BaseEntry>(name: string, entries: T[]): Collection<T> {
+export function createCollection<T extends BaseEntry>(name: string, entries: T[]): Collection<T> {
   return {
     name,
     entries,

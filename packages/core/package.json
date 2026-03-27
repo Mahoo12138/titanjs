@@ -26,6 +26,7 @@
     "preact": "^10.29.1",
     "preact-render-to-string": "^6.6.7",
     "rehype-stringify": "^10.0.0",
+    "remark-directive": "^4.0.0",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.0.0",
     "unified": "^11.0.0",

@@ -22,6 +22,9 @@ export type { PluginNode, ExecutionPlan } from './ioc.js'
 export { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 export type { EntryDependencies, DependencyManifest } from './dependency-tracker.js'
 
+// Widget system
+export { WidgetRegistry } from './widget-registry.js'
+
 // Phase 3 - Theme system
 export { loadTheme, resolveLayout } from './theme-loader.js'
 export { renderLayout, Slot, buildHtmlDocument } from './renderer.js'

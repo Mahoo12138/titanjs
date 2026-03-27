@@ -99,9 +99,15 @@ function buildPageContext(
   siteContext: SiteContext,
   theme: ResolvedTheme,
 ): PageContext | null {
+  // Inject widgetRegistry into theme config so layouts can access it
+  const themeConfigWithWidgets = {
+    ...theme.config,
+    __widgetRegistry: (theme as any).widgetRegistry ?? null,
+  }
+
   const base: PageContext = {
     site: siteContext,
-    theme: theme.config,
+    theme: themeConfigWithWidgets,
     route,
     pagination: route.pagination,
   }
@@ -125,6 +131,21 @@ function buildPageContext(
   // Index list
   if (type === 'list' && route.url === '/') {
     return { ...base, posts: siteData.posts.entries } as ListContext
+  }
+
+  // Archive list (all posts for archive page)
+  if (type === 'list' && route.layout === 'archive') {
+    return { ...base, posts: siteData.posts.entries } as ListContext
+  }
+
+  // Tags index (all tags)
+  if (type === 'list' && route.layout === 'tags') {
+    return { ...base, posts: [], tags: [...siteData.tags.values()] } as any
+  }
+
+  // Categories index (all categories)
+  if (type === 'list' && route.layout === 'categories') {
+    return { ...base, posts: [], categories: [...siteData.categories.values()] } as any
   }
 
   // Tag list
@@ -151,11 +172,18 @@ function buildPageContext(
   if (type === 'item' && slug) {
     const entry = findEntryInSiteData(siteData, contentType, slug)
     if (!entry) return null
-    return { ...base, entry, collection: contentType } as any
+    return {
+      ...base,
+      entry,
+      collection: contentType,
+      // Forward route data (e.g., wikiTree, notebooksTree)
+      ...route.data,
+    } as any
   }
 
-  // Generic list
-  return { ...base, posts: [] } as ListContext
+  // Custom collection list / generic list
+  // Forward any route.data (wikiTree, filterTag, notebooksTree, etc.)
+  return { ...base, posts: [], ...route.data } as any
 }
 
 function findEntryInSiteData(
@@ -184,10 +212,24 @@ function extractTitle(route: Route, siteData: SiteData): string {
     }
   }
   if (type === 'list' && contentType === 'tag') {
-    return `Tag: ${(route.data?.tag as any)?.name ?? ''}`
+    if (route.data?.tag) return `Tag: ${(route.data.tag as any)?.name ?? ''}`
+    return 'Tags'
   }
   if (type === 'list' && contentType === 'category') {
-    return `Category: ${(route.data?.category as any)?.name ?? ''}`
+    if (route.data?.category) return `Category: ${(route.data.category as any)?.name ?? ''}`
+    return 'Categories'
+  }
+  if (route.layout === 'archive') {
+    return 'Archives'
+  }
+  if (route.layout === 'wiki-index') {
+    return route.data?.filterTag ? `Wiki: ${route.data.filterTag}` : 'Wiki'
+  }
+  if (route.layout === 'wiki') {
+    return ''  // title extracted from entry below
+  }
+  if (route.layout === 'notebooks' || route.layout === 'notes') {
+    return route.data?.notebook ? String(route.data.notebook) : 'Notebooks'
   }
   return ''
 }

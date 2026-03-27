@@ -17,15 +17,38 @@ import type { LoadContext, TransformContext, BaseEntry, Post, Page, Heading, Ass
 import type { MarkdownConfig } from '@titan/types'
 
 /**
- * Create a Markdown processor with the given config
+ * Create a Markdown processor with the given config.
+ * remarkPlugins are inserted between remarkParse and remarkRehype,
+ * rehypePlugins between remarkRehype and rehypeStringify.
  */
 export function createMarkdownProcessor(config: MarkdownConfig) {
-  const processor = unified()
-    .use(remarkParse)
-    .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeStringify, { allowDangerousHtml: true })
+  // Use `any` throughout so chained `.use()` return types don't conflict
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let processor: any = unified().use(remarkParse)
 
-  return processor
+  // Inject remark plugins (operate on mdast)
+  for (const p of config.remarkPlugins ?? []) {
+    if (Array.isArray(p)) {
+      processor = processor.use(p[0], ...p.slice(1))
+    } else {
+      processor = processor.use(p)
+    }
+  }
+
+  processor = processor.use(remarkRehype, { allowDangerousHtml: true })
+
+  // Inject rehype plugins (operate on hast)
+  for (const p of config.rehypePlugins ?? []) {
+    if (Array.isArray(p)) {
+      processor = processor.use(p[0], ...p.slice(1))
+    } else {
+      processor = processor.use(p)
+    }
+  }
+
+  processor = processor.use(rehypeStringify, { allowDangerousHtml: true })
+
+  return processor as ReturnType<typeof unified>
 }
 
 /**
