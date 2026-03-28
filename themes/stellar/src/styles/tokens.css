@@ -1,0 +1,150 @@
+/**
+ * Stellar Design Tokens
+ *
+ * Dark immersive theme with warm amber/coral accent.
+ * Designed for creative portfolios & designer blogs.
+ *
+ * Palette: Deep charcoal base, warm tinted surfaces, amber accent.
+ */
+
+:root {
+  /* ── Colors: Dark Immersive with Warm Undertones ── */
+  --t-color-bg:            #111113;
+  --t-color-bg-subtle:     #19191d;
+  --t-color-surface:       #1e1e23;
+  --t-color-border:        rgba(255, 255, 255, 0.06);
+  --t-color-text:          #e8e4df;
+  --t-color-text-muted:    #8a857e;
+  --t-color-accent:        #e8854a;
+  --t-color-accent-hover:  #f09a64;
+  --t-color-code-bg:       #1a1a1f;
+  --t-color-tag-bg:        rgba(232, 133, 74, 0.12);
+  --t-color-tag-text:      #f0a06a;
+
+  /* Extended palette */
+  --t-color-accent-dim:    rgba(232, 133, 74, 0.15);
+  --t-color-glow:          rgba(232, 133, 74, 0.06);
+  --t-color-surface-hover: #252529;
+  --t-color-surface-2:     #161619;
+
+  /* ── Typography ── */
+  --t-font-sans:    'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Noto Sans SC', sans-serif;
+  --t-font-mono:    'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --t-font-serif:   'Playfair Display', 'Noto Serif SC', Georgia, serif;
+  --t-font-display: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+
+  /* Fluid type scale — dramatic jumps for hierarchy */
+  --t-text-xs:      clamp(0.7rem, 0.65rem + 0.2vw, 0.75rem);
+  --t-text-sm:      clamp(0.8rem, 0.75rem + 0.25vw, 0.875rem);
+  --t-text-base:    clamp(0.95rem, 0.9rem + 0.25vw, 1rem);
+  --t-text-lg:      clamp(1.05rem, 1rem + 0.3vw, 1.15rem);
+  --t-text-xl:      clamp(1.2rem, 1.1rem + 0.5vw, 1.35rem);
+  --t-text-2xl:     clamp(1.5rem, 1.3rem + 1vw, 1.875rem);
+  --t-text-3xl:     clamp(1.875rem, 1.5rem + 1.5vw, 2.5rem);
+  --t-text-4xl:     clamp(2.25rem, 1.8rem + 2vw, 3.25rem);
+
+  --t-leading-tight:    1.2;
+  --t-leading-normal:   1.5;
+  --t-leading-relaxed:  1.7;
+
+  /* ── Spacing — generous, breathable ── */
+  --t-space-1:   0.25rem;
+  --t-space-2:   0.5rem;
+  --t-space-3:   0.75rem;
+  --t-space-4:   1rem;
+  --t-space-6:   1.5rem;
+  --t-space-8:   2rem;
+  --t-space-10:  2.5rem;
+  --t-space-12:  3rem;
+  --t-space-16:  4rem;
+  --t-space-20:  5rem;
+  --t-space-24:  6rem;
+
+  /* ── Borders & Shadows — deep, layered ── */
+  --t-radius-xs:    4px;
+  --t-radius-sm:    8px;
+  --t-radius-md:    14px;
+  --t-radius-lg:    20px;
+  --t-radius-full:  9999px;
+
+  --t-shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --t-shadow-md:  0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --t-shadow-lg:  0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --t-shadow-glow: 0 0 30px rgba(232, 133, 74, 0.08);
+
+  /* ── Z-Index ── */
+  --t-z-base:       0;
+  --t-z-dropdown:   100;
+  --t-z-modal:      200;
+  --t-z-toast:      300;
+
+  /* ── Layout ── */
+  --t-max-width:       1440px;
+  --t-header-height:   64px;
+
+  /* ── Stellar-specific tokens ── */
+  --stellar-sidebar-width:  280px;
+  --stellar-main-max-width: 840px;
+  --stellar-card-radius:    var(--t-radius-md);
+  --stellar-transition:     0.3s cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* ── Motion ── */
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out:    cubic-bezier(0.45, 0, 0.55, 1);
+  --duration-fast:  150ms;
+  --duration-base:  250ms;
+  --duration-slow:  400ms;
+  --duration-enter: 600ms;
+}
+
+/* ── Light Mode Override ── */
+[data-theme="light"] {
+  --t-color-bg:            #faf8f5;
+  --t-color-bg-subtle:     #f2efe9;
+  --t-color-surface:       #ffffff;
+  --t-color-border:        rgba(68, 50, 30, 0.08);
+  --t-color-text:          #2c2825;
+  --t-color-text-muted:    #8c8378;
+  --t-color-accent:        #d47730;
+  --t-color-accent-hover:  #c06820;
+  --t-color-code-bg:       #f5f2ed;
+  --t-color-tag-bg:        rgba(212, 119, 48, 0.1);
+  --t-color-tag-text:      #c06820;
+
+  --t-color-accent-dim:    rgba(212, 119, 48, 0.1);
+  --t-color-glow:          rgba(212, 119, 48, 0.04);
+  --t-color-surface-hover: #f8f5f0;
+  --t-color-surface-2:     #f0ede6;
+
+  --t-shadow-sm:  0 1px 3px rgba(44, 40, 37, 0.06);
+  --t-shadow-md:  0 4px 12px rgba(44, 40, 37, 0.08);
+  --t-shadow-lg:  0 12px 40px rgba(44, 40, 37, 0.12);
+  --t-shadow-glow: 0 0 30px rgba(212, 119, 48, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --t-color-bg:            #faf8f5;
+    --t-color-bg-subtle:     #f2efe9;
+    --t-color-surface:       #ffffff;
+    --t-color-border:        rgba(68, 50, 30, 0.08);
+    --t-color-text:          #2c2825;
+    --t-color-text-muted:    #8c8378;
+    --t-color-accent:        #d47730;
+    --t-color-accent-hover:  #c06820;
+    --t-color-code-bg:       #f5f2ed;
+    --t-color-tag-bg:        rgba(212, 119, 48, 0.1);
+    --t-color-tag-text:      #c06820;
+
+    --t-color-accent-dim:    rgba(212, 119, 48, 0.1);
+    --t-color-glow:          rgba(212, 119, 48, 0.04);
+    --t-color-surface-hover: #f8f5f0;
+    --t-color-surface-2:     #f0ede6;
+
+    --t-shadow-sm:  0 1px 3px rgba(44, 40, 37, 0.06);
+    --t-shadow-md:  0 4px 12px rgba(44, 40, 37, 0.08);
+    --t-shadow-lg:  0 12px 40px rgba(44, 40, 37, 0.12);
+    --t-shadow-glow: 0 0 30px rgba(212, 119, 48, 0.06);
+  }
+}

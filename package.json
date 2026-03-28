@@ -6,8 +6,8 @@
   "description": "Titan: A modern static site generator, reimagined.",
   "packageManager": "pnpm@10.6.2",
   "scripts": {
-    "build": "pnpm -r --filter='./packages/*' run build",
-    "dev": "pnpm -r --filter='./packages/*' run --parallel dev",
+    "build": "pnpm -r --filter='./packages/*' --filter='./plugins/*' --filter='./themes/*' run build",
+    "dev": "pnpm -r --filter='./packages/*' --filter='./plugins/*' --filter='./themes/*' run --parallel dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "pnpm -r run clean && rm -rf node_modules"
