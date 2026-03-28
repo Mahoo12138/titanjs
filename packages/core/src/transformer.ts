@@ -11,6 +11,7 @@
 import path from 'node:path'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
+import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
 import rehypeStringify from 'rehype-stringify'
 import type { LoadContext, TransformContext, BaseEntry, Post, Page, Heading, AssetRef, Tag, Category } from '@titan/types'
@@ -24,7 +25,7 @@ import type { MarkdownConfig } from '@titan/types'
 export function createMarkdownProcessor(config: MarkdownConfig) {
   // Use `any` throughout so chained `.use()` return types don't conflict
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let processor: any = unified().use(remarkParse)
+  let processor: any = unified().use(remarkParse).use(remarkGfm)
 
   // Inject remark plugins (operate on mdast)
   for (const p of config.remarkPlugins ?? []) {

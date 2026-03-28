@@ -48,9 +48,12 @@ export async function loadTheme(
   // Resolve theme directory
   const themeDir = await resolveThemeDir(themeName, rootDir)
 
+  // Prefer dist/ directory if it contains a built theme
+  const effectiveDir = await resolveEffectiveThemeDir(themeDir)
+
   // Load theme definition
   const importFn = importer ?? defaultImport
-  const definition = await loadThemeDefinition(themeDir, importFn)
+  const definition = await loadThemeDefinition(effectiveDir, importFn)
 
   // Validate theme config
   let resolvedConfig: Record<string, unknown> = {}
@@ -70,7 +73,7 @@ export async function loadTheme(
   }
 
   // Load layouts
-  const layouts = await loadLayouts(themeDir, importFn)
+  const layouts = await loadLayouts(effectiveDir, importFn)
 
   // Build type → layout map
   const typeLayoutMap: Record<string, string> = {
@@ -91,7 +94,7 @@ export async function loadTheme(
   const slotComponents = collectSlotComponents(plugins, definition)
 
   // Load theme styles (style.css)
-  const styles = await loadThemeStyles(themeDir)
+  const styles = await loadThemeStyles(effectiveDir)
 
   return {
     definition,
@@ -99,7 +102,7 @@ export async function loadTheme(
     layouts,
     slotComponents,
     typeLayoutMap,
-    rootDir: themeDir,
+    rootDir: effectiveDir,
     styles,
   }
 }
@@ -124,6 +127,22 @@ export function resolveLayout(
 
   // 3. Fallback to default
   return 'default'
+}
+
+/**
+ * If the theme has a dist/ directory containing a built theme config,
+ * use dist/ as the effective directory. Otherwise fall back to the root.
+ */
+async function resolveEffectiveThemeDir(themeDir: string): Promise<string> {
+  const distDir = path.join(themeDir, 'dist')
+  if (!await exists(distDir)) return themeDir
+
+  const configNames = ['theme.config.ts', 'theme.config.js', 'theme.config.mjs']
+  for (const name of configNames) {
+    if (await exists(path.join(distDir, name))) return distDir
+  }
+
+  return themeDir
 }
 
 /**
