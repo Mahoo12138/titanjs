@@ -65,7 +65,7 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
       const islandId = `island-${currentRenderContext!.islandCounter++}`
       currentRenderContext!.islands.push({
         id: islandId,
-        name: sc.slot,
+        name: sc.slot.replace(/:/g, '-'),
         activate: sc.island.activate,
         props,
       })

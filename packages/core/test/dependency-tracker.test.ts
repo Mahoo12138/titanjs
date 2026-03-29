@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { DependencyTracker, hashFile, hashData } from '../src/dependency-tracker.js'
+import { DependencyTracker, hashFile, hashData, buildRouteDependencyIndex, collectAffectedRoutes } from '../src/dependency-tracker.js'
 import type { EntryDependencies } from '../src/dependency-tracker.js'
+import type { Route } from '@titan/types'
 
 describe('DependencyTracker', () => {
   let tmpDir: string
@@ -208,5 +209,171 @@ describe('hashFile / hashData', () => {
     expect(hash1).toBe(hash2)
     expect(hash1).not.toBe(hash3)
     expect(hash1).toHaveLength(16)
+  })
+})
+
+describe('route dependency index', () => {
+  function makeRoutes(): Route[] {
+    return [
+      {
+        path: '/posts/:slug',
+        url: '/posts/hello/',
+        contentType: 'post',
+        slug: 'hello',
+        layout: 'post',
+        outputPath: 'posts/hello/index.html',
+        type: 'item',
+      },
+      {
+        path: '/posts/:slug',
+        url: '/posts/second/',
+        contentType: 'post',
+        slug: 'second',
+        layout: 'post',
+        outputPath: 'posts/second/index.html',
+        type: 'item',
+      },
+      {
+        path: '/',
+        url: '/',
+        contentType: 'post',
+        layout: 'index',
+        outputPath: 'index.html',
+        type: 'list',
+      },
+      {
+        path: '/archives',
+        url: '/archives/',
+        contentType: 'post',
+        layout: 'archive',
+        outputPath: 'archives/index.html',
+        type: 'list',
+      },
+      {
+        path: '/tags/:slug',
+        url: '/tags/test/',
+        contentType: 'tag',
+        slug: 'test',
+        layout: 'tag',
+        outputPath: 'tags/test/index.html',
+        type: 'list',
+        data: { tag: { slug: 'test' } },
+      },
+      {
+        path: '/tags/:slug',
+        url: '/tags/unique/',
+        contentType: 'tag',
+        slug: 'unique',
+        layout: 'tag',
+        outputPath: 'tags/unique/index.html',
+        type: 'list',
+        data: { tag: { slug: 'unique' } },
+      },
+      {
+        path: '/tags/:slug',
+        url: '/tags/promoted/',
+        contentType: 'tag',
+        slug: 'promoted',
+        layout: 'tag',
+        outputPath: 'tags/promoted/index.html',
+        type: 'list',
+        data: { tag: { slug: 'promoted' } },
+      },
+      {
+        path: '/tags',
+        url: '/tags/',
+        contentType: 'tag',
+        layout: 'tags',
+        outputPath: 'tags/index.html',
+        type: 'list',
+      },
+    ]
+  }
+
+  it('should keep body-only invalidation on the entry route', () => {
+    const routes = makeRoutes()
+    const entries = [
+      {
+        id: 'hello',
+        slug: 'hello',
+        contentType: 'post',
+        tags: [{ slug: 'test' }, { slug: 'unique' }],
+        categories: [],
+        date: new Date('2024-01-15'),
+      },
+      {
+        id: 'second',
+        slug: 'second',
+        contentType: 'post',
+        tags: [{ slug: 'test' }],
+        categories: [],
+        date: new Date('2024-02-01'),
+      },
+    ]
+
+    const index = buildRouteDependencyIndex(routes, entries)
+    const affected = collectAffectedRoutes('hello', index, false)
+
+    expect([...affected]).toEqual(['/posts/hello/'])
+  })
+
+  it('should include previous routes for frontmatter cascades', () => {
+    const previousIndex = buildRouteDependencyIndex(makeRoutes(), [
+      {
+        id: 'hello',
+        slug: 'hello',
+        contentType: 'post',
+        tags: [{ slug: 'test' }, { slug: 'unique' }],
+        categories: [],
+        date: new Date('2024-01-15'),
+      },
+      {
+        id: 'second',
+        slug: 'second',
+        contentType: 'post',
+        tags: [{ slug: 'test' }],
+        categories: [],
+        date: new Date('2024-02-01'),
+      },
+    ])
+
+    const currentIndex = buildRouteDependencyIndex(makeRoutes(), [
+      {
+        id: 'hello',
+        slug: 'hello',
+        contentType: 'post',
+        tags: [{ slug: 'test' }, { slug: 'promoted' }],
+        categories: [],
+        date: new Date('2024-03-01'),
+      },
+      {
+        id: 'second',
+        slug: 'second',
+        contentType: 'post',
+        tags: [{ slug: 'test' }],
+        categories: [],
+        date: new Date('2024-02-01'),
+      },
+    ])
+
+    const affected = collectAffectedRoutes(
+      'hello',
+      currentIndex,
+      true,
+      ['test', 'unique'],
+      ['test', 'promoted'],
+      [],
+      [],
+      previousIndex,
+    )
+
+    expect(affected).toContain('/posts/hello/')
+    expect(affected).toContain('/posts/second/')
+    expect(affected).toContain('/')
+    expect(affected).toContain('/archives/')
+    expect(affected).toContain('/tags/test/')
+    expect(affected).toContain('/tags/unique/')
+    expect(affected).toContain('/tags/promoted/')
+    expect(affected).toContain('/tags/')
   })
 })

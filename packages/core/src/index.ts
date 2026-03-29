@@ -9,7 +9,7 @@ export { emitRoutes } from './emitter.js'
 export { defineConfig, loadConfig } from './config.js'
 export { FileSystemCache } from './cache.js'
 export { Engine } from './engine.js'
-export type { EngineOptions, BuildResult } from './engine.js'
+export type { EngineOptions, BuildResult, LoadResult, TransformResult, GenerateResult, ThemeResult } from './engine.js'
 export type { EmitterOptions } from './emitter.js'
 export type { LoaderOptions } from './loader.js'
 
@@ -19,8 +19,12 @@ export { SingletonRegistry } from './singleton-registry.js'
 export { definePlugin } from './plugin.js'
 export { buildExecutionPlan, executePluginPlan } from './ioc.js'
 export type { PluginNode, ExecutionPlan } from './ioc.js'
-export { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
-export type { EntryDependencies, DependencyManifest } from './dependency-tracker.js'
+export { DependencyTracker, hashFile, hashData, buildRouteDependencyIndex, collectAffectedRoutes } from './dependency-tracker.js'
+export type { EntryDependencies, DependencyManifest, RouteDependencyIndex } from './dependency-tracker.js'
+
+// Dev Server
+export { DevSession } from './dev-session.js'
+export type { DevSessionOptions, FileChangeResult, DevSessionStats } from './dev-session.js'
 
 // Widget system
 export { WidgetRegistry } from './widget-registry.js'
