@@ -11,7 +11,8 @@
 import path from 'node:path'
 import { cac } from 'cac'
 import pc from 'picocolors'
-import { loadConfig, Engine, loadTheme, DESIGN_TOKENS, extractAssignedTokens, buildStyles } from '@titan/core'
+import { loadConfig, Engine, DevSession, loadTheme, DESIGN_TOKENS, extractAssignedTokens } from '@titan/core'
+import { titanVitePlugin } from '@titan/vite-plugin'
 
 const cli = cac('titan')
 
@@ -52,64 +53,94 @@ cli
   .command('dev', 'Start development server')
   .option('--port <port>', 'Dev server port', { default: 4000 })
   .option('--host [host]', 'Dev server host')
+  .option('--debug', 'Enable dev diagnostics')
   .option('--root <dir>', 'Project root directory', { default: '.' })
-  .action(async (options: { port: number; host?: string | boolean; root: string }) => {
+  .action(async (options: { port: number; host?: string | boolean; debug?: boolean; root: string }) => {
     const rootDir = resolveRoot(options.root)
 
     console.log(pc.cyan('⚡ Titan') + ' Starting dev server...\n')
 
     try {
       const config = await loadConfig(rootDir)
-      const engine = new Engine({ rootDir, config })
-      const result = await engine.build()
 
-      const { createServer } = await import('node:http')
-      const { readFile } = await import('node:fs/promises')
-      const { join, extname } = await import('node:path')
-
-      const MIME_TYPES: Record<string, string> = {
-        '.html': 'text/html',
-        '.css': 'text/css',
-        '.js': 'application/javascript',
-        '.json': 'application/json',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.ico': 'image/x-icon',
-      }
-
-      const server = createServer(async (req, res) => {
-        let urlPath = req.url || '/'
-        urlPath = urlPath.split('?')[0]
-        try { urlPath = decodeURIComponent(urlPath) } catch { /* malformed URI — keep as-is */ }
-        if (urlPath.endsWith('/')) urlPath += 'index.html'
-        if (!extname(urlPath)) urlPath += '/index.html'
-
-        const filePath = join(result.outDir, urlPath)
-        try {
-          const content = await readFile(filePath)
-          const ext = extname(filePath)
-          res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' })
-          res.end(content)
-        } catch {
-          res.writeHead(404, { 'Content-Type': 'text/html' })
-          res.end('<h1>404 Not Found</h1>')
-        }
+      // Create DevSession (lightweight index, no full HTML emit)
+      const session = new DevSession({
+        rootDir,
+        config,
+        debug: Boolean(options.debug),
       })
+      const initResult = await session.init()
+
+      console.log(
+        pc.green('✓') +
+        ` Index ready: ${initResult.entries} entries, ${initResult.routes} routes` +
+        pc.dim(` (${initResult.elapsed}ms)`)
+      )
+
+      // Create Vite dev server with Titan plugin
+      const { createServer } = await import('vite')
 
       const host = options.host === true ? '0.0.0.0' : (typeof options.host === 'string' ? options.host : 'localhost')
       const port = Number(options.port)
 
-      server.listen(port, host, () => {
-        console.log(
-          pc.green('✓') +
-          ` Dev server running at ` +
-          pc.cyan(`http://${host}:${port}/`)
-        )
-        console.log(pc.dim(`  ${result.entries} entries, ${result.routes} routes`))
-        console.log(pc.dim('\n  Press Ctrl+C to stop\n'))
+      const viteServer = await createServer({
+        root: rootDir,
+        server: {
+          host,
+          port,
+          strictPort: false,
+        },
+        plugins: [
+          titanVitePlugin({
+            rootDir,
+            config,
+            devSession: session,
+            onFileChange(filePath, result) {
+              const relPath = path.relative(rootDir, filePath)
+              const changeType = result.frontmatterChanged ? 'frontmatter' : 'body'
+              const cacheRate = Math.round(session.cacheHitRate * 100)
+              if (result.entryId) {
+                console.log(
+                  pc.dim(`  [hmr]`) +
+                  ` ${relPath}` +
+                  pc.dim(` (${changeType})`) +
+                  pc.dim(` → ${result.affectedRoutes.length} route(s)`) +
+                  pc.dim(` (${result.elapsed}ms, cache ${cacheRate}%)`)
+                )
+              } else {
+                console.log(
+                  pc.dim(`  [hmr]`) +
+                  pc.yellow(` full re-index`) +
+                  pc.dim(` (${result.elapsed}ms, cache ${cacheRate}%)`)
+                )
+              }
+
+              if (options.debug && result.affectedRoutes.length > 0) {
+                const preview = result.affectedRoutes.slice(0, 5).join(', ')
+                const suffix = result.affectedRoutes.length > 5 ? ', ...' : ''
+                console.log(pc.dim(`        ${preview}${suffix}`))
+              }
+            },
+          }),
+        ],
+        // Suppress Vite's default HTML handling
+        appType: 'custom',
+        logLevel: 'warn',
       })
+
+      await viteServer.listen()
+
+      console.log(
+        pc.green('✓') +
+        ` Dev server running at ` +
+        pc.cyan(`http://${host}:${port}/`)
+      )
+      console.log(pc.dim('  Pages are compiled on first visit'))
+      console.log(pc.dim('  Markdown changes trigger precise HMR'))
+      if (options.debug) {
+        console.log(pc.dim('  Dev diagnostics enabled'))
+      }
+      console.log(pc.dim('\n  Press Ctrl+C to stop\n'))
     } catch (err) {
       printError(err)
       process.exit(1)
@@ -260,34 +291,59 @@ cli
     try {
       const config = await loadConfig(rootDir)
 
-      const timings: { label: string; elapsed: number }[] = []
-      const mark = (label: string, fn: () => Promise<void>) => async () => {
-        const start = performance.now()
-        await fn()
-        timings.push({ label, elapsed: Math.round(performance.now() - start) })
-      }
-
-      // Run a full build, measuring each phase
-      const totalStart = performance.now()
-
       const engine = new Engine({
         rootDir,
         config,
         noCache: true,
       })
 
-      const result = await engine.build()
-      const totalElapsed = Math.round(performance.now() - totalStart)
+      // Measure each phase independently using decomposed sub-methods
+      const timings: { label: string; elapsed: number }[] = []
+      const totalStart = performance.now()
 
-      // Engine.build() already measures total elapsed
-      console.log(`  ${pc.bold('Total build time:')} ${pc.yellow(result.elapsed + 'ms')}`)
-      console.log(`  ${pc.dim(`${result.entries} entries, ${result.routes} routes`)}`)
-      console.log(`  ${pc.dim(`Output: ${result.outDir}`)}\n`)
+      let start = performance.now()
+      await engine.init()
+      timings.push({ label: 'Init (plugins, hooks, processor)', elapsed: Math.round(performance.now() - start) })
+
+      start = performance.now()
+      const { loadContexts, singletonData } = await engine.loadAll()
+      timings.push({ label: `Load (${loadContexts.length} files)`, elapsed: Math.round(performance.now() - start) })
+
+      start = performance.now()
+      const { entries } = await engine.transformAll(loadContexts)
+      timings.push({ label: `Transform (${entries.length} entries)`, elapsed: Math.round(performance.now() - start) })
+
+      start = performance.now()
+      const { generateCtx } = await engine.generate(entries, singletonData)
+      timings.push({ label: `Generate (${generateCtx.routes.length} routes)`, elapsed: Math.round(performance.now() - start) })
+
+      start = performance.now()
+      const { theme } = await engine.resolveTheme()
+      timings.push({ label: 'Theme resolve', elapsed: Math.round(performance.now() - start) })
+
+      start = performance.now()
+      await engine.emit(generateCtx, theme)
+      timings.push({ label: 'Emit (HTML write)', elapsed: Math.round(performance.now() - start) })
+
+      const totalElapsed = Math.round(performance.now() - totalStart)
+      const outDir = path.join(rootDir, config.build.outDir)
+
+      // Print per-phase breakdown
+      console.log(`  ${pc.bold('Phase breakdown:')}`)
+      for (const t of timings) {
+        const bar = '█'.repeat(Math.max(1, Math.round(t.elapsed / totalElapsed * 20)))
+        console.log(`  ${pc.dim(bar)} ${t.label} ${pc.yellow(t.elapsed + 'ms')}`)
+      }
+
+      console.log()
+      console.log(`  ${pc.bold('Total:')} ${pc.yellow(totalElapsed + 'ms')}`)
+      console.log(`  ${pc.dim(`${entries.length} entries, ${generateCtx.routes.length} routes`)}`)
+      console.log(`  ${pc.dim(`Output: ${outDir}`)}\n`)
 
       // Provide advice based on results
-      if (result.elapsed > 5000) {
+      if (totalElapsed > 5000) {
         console.log(pc.yellow('  Tip: Build took >5s. Consider using incremental builds (remove --no-cache).'))
-      } else if (result.elapsed > 1000) {
+      } else if (totalElapsed > 1000) {
         console.log(pc.dim('  Build time is reasonable.'))
       } else {
         console.log(pc.green('  ✓') + ' Fast build!')
