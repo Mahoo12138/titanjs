@@ -3,22 +3,14 @@
  *
  * Shows the section/page tree for the current wiki project.
  */
+import { z } from 'zod'
 
 export const treeWidget = {
   name: 'tree',
 
-  configSchema: {
-    parse: (v: any) => ({
-      title: v?.title ?? '',
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: treeWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    title: z.string().default(''),
+  }),
 
   dataLoader: function treeDataLoader(ctx: any) {
     const entry = ctx.entry

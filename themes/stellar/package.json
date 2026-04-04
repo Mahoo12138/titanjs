@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "preact": "^10.19.0",
-    "preact-render-to-string": "^6.3.0"
+    "preact-render-to-string": "^6.3.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@titan/types": "workspace:*",

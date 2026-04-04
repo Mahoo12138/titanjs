@@ -3,6 +3,7 @@
  *
  * Renders the heading tree from the current entry's headings.
  */
+import { z } from 'zod'
 
 function renderTocList(headings: any[], config: any): any {
   return (
@@ -22,21 +23,12 @@ function renderTocList(headings: any[], config: any): any {
 export const tocWidget = {
   name: 'toc',
 
-  configSchema: {
-    parse: (v: any) => ({
-      listNumber: v?.listNumber ?? false,
-      minDepth: v?.minDepth ?? 2,
-      maxDepth: v?.maxDepth ?? 4,
-      collapse: v?.collapse ?? false,
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: tocWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    listNumber: z.boolean().default(false),
+    minDepth: z.number().default(2),
+    maxDepth: z.number().default(4),
+    collapse: z.boolean().default(false),
+  }),
 
   component: function TocWidget(ctx: any) {
     const { config, entry } = ctx

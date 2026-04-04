@@ -3,25 +3,17 @@
  *
  * Renders tags with proportional font sizes.
  */
+import { z } from 'zod'
 
 export const tagcloudWidget = {
   name: 'tagcloud',
 
-  configSchema: {
-    parse: (v: any) => ({
-      title: v?.title ?? '标签云',
-      minFont: v?.minFont ?? 12,
-      maxFont: v?.maxFont ?? 24,
-      limit: v?.limit ?? 100,
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: tagcloudWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    title: z.string().default('标签云'),
+    minFont: z.number().default(12),
+    maxFont: z.number().default(24),
+    limit: z.number().default(100),
+  }),
 
   dataLoader: function tagcloudDataLoader(ctx: any) {
     const tags = ctx.siteData.tags

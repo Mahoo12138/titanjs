@@ -3,23 +3,15 @@
  *
  * Shows the most recently updated posts.
  */
+import { z } from 'zod'
 
 export const recentWidget = {
   name: 'recent',
 
-  configSchema: {
-    parse: (v: any) => ({
-      limit: v?.limit ?? 10,
-      rss: v?.rss ?? '/atom.xml',
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: recentWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    limit: z.number().default(10),
+    rss: z.string().default('/atom.xml'),
+  }),
 
   dataLoader: function recentDataLoader(ctx: any) {
     const posts = ctx.siteData.posts?.entries ?? []

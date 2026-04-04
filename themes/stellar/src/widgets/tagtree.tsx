@@ -4,6 +4,7 @@
  * Shows the tag tree for the current notebook.
  */
 import { h } from 'preact'
+import { z } from 'zod'
 
 function renderNode(tagTree: any, nodeId: string, depth: number, activeTag: string): any {
   const node = tagTree instanceof Map ? tagTree.get(nodeId) : tagTree[nodeId]
@@ -36,19 +37,10 @@ function renderNode(tagTree: any, nodeId: string, depth: number, activeTag: stri
 export const tagtreeWidget = {
   name: 'tagtree',
 
-  configSchema: {
-    parse: (v: any) => ({
-      expandAll: v?.expandAll ?? true,
-      title: v?.title ?? '标签',
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: tagtreeWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    expandAll: z.boolean().default(true),
+    title: z.string().default('标签'),
+  }),
 
   dataLoader: function tagtreeDataLoader(ctx: any) {
     const entry = ctx.entry

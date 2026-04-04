@@ -3,26 +3,18 @@
  *
  * Shows the post author's avatar, name, bio, and link to all posts.
  */
+import { z } from 'zod'
 
 export const authorWidget = {
   name: 'author',
 
-  configSchema: {
-    parse: (v: any) => ({
-      showAvatar: v?.showAvatar ?? true,
-      name: v?.name ?? '',
-      avatar: v?.avatar ?? '',
-      bio: v?.bio ?? '',
-      url: v?.url ?? '/about/',
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: authorWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    showAvatar: z.boolean().default(true),
+    name: z.string().default(''),
+    avatar: z.string().default(''),
+    bio: z.string().default(''),
+    url: z.string().default('/about/'),
+  }),
 
   component: function AuthorWidget(ctx: any) {
     const { config, site } = ctx

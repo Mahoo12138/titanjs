@@ -3,23 +3,15 @@
  *
  * Shows posts related to the current post by shared tags.
  */
+import { z } from 'zod'
 
 export const relatedWidget = {
   name: 'related',
 
-  configSchema: {
-    parse: (v: any) => ({
-      title: v?.title ?? '相关文章',
-      limit: v?.limit ?? 5,
-    }),
-    safeParse: (v: any) => {
-      try {
-        return { success: true, data: relatedWidget.configSchema.parse(v) }
-      } catch (e) {
-        return { success: false, error: { issues: [{ message: String(e) }] } }
-      }
-    },
-  },
+  configSchema: z.object({
+    title: z.string().default('相关文章'),
+    limit: z.number().default(5),
+  }),
 
   dataLoader: function relatedDataLoader(ctx: any) {
     const entry = ctx.entry
