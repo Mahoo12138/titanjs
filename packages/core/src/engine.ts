@@ -42,6 +42,7 @@ import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 import { PluginManager } from './plugin-manager.js'
 import { StyleManager } from './style-manager.js'
 import { TitanEventEmitter } from './event-emitter.js'
+import { runConcurrent } from './concurrency.js'
 
 export interface EngineOptions {
   /** Project root directory (absolute) */
@@ -100,6 +101,9 @@ export class Engine {
   readonly transformPipeline = new Pipeline<TransformContext>()
   readonly generatePipeline = new Pipeline<GenerateContext>()
   readonly emitPipeline = new Pipeline<EmitContext>()
+
+  // Entry ID → source file content hash (populated during transform)
+  private entryFileHashes = new Map<string, string>()
 
   // Reusable processor (created once during init)
   private processor: ReturnType<typeof createMarkdownProcessor> | null = null
@@ -189,12 +193,9 @@ export class Engine {
       loadContexts.push(...collectionContexts)
     }
 
-    // Run load pipeline on each context (with concurrency)
+    // Run load pipeline on each context (sliding-window concurrency)
     const concurrency = this.config.build.concurrency
-    for (let i = 0; i < loadContexts.length; i += concurrency) {
-      const batch = loadContexts.slice(i, i + concurrency)
-      await Promise.all(batch.map(ctx => this.loadPipeline.run(ctx)))
-    }
+    await runConcurrent(loadContexts, concurrency, ctx => this.loadPipeline.run(ctx))
 
     this.events.emit('load:complete', { fileCount: loadContexts.length })
 
@@ -209,15 +210,12 @@ export class Engine {
 
     const processor = this.processor!
     const concurrency = this.config.build.concurrency
-    const entries: BaseEntry[] = []
 
-    for (let i = 0; i < loadContexts.length; i += concurrency) {
-      const batch = loadContexts.slice(i, i + concurrency)
-      const results = await Promise.all(
-        batch.map(loadCtx => this.transformSingle(loadCtx, processor)),
-      )
-      entries.push(...results)
-    }
+    const entries = await runConcurrent(
+      loadContexts,
+      concurrency,
+      loadCtx => this.transformSingle(loadCtx, processor),
+    )
 
     this.events.emit('transform:complete', { entryCount: entries.length })
 
@@ -242,6 +240,10 @@ export class Engine {
 
     // Transform
     const transformCtx = await transformEntry(loadCtx, proc, this.sourceDir)
+
+    // Compute and store file content hash for dependency tracking
+    const contentHash = hashData(loadCtx.rawContent)
+    this.entryFileHashes.set(transformCtx.entry.id, contentHash)
 
     // Run transform pipeline (plugin hooks)
     await this.transformPipeline.run(transformCtx)
@@ -524,7 +526,7 @@ export class Engine {
       const isPost = entry.contentType === 'post'
       const post = isPost ? (entry as import('@titan/types').Post) : null
       this.depTracker.recordEntry(entry.id, {
-        fileHash: '',
+        fileHash: this.entryFileHashes.get(entry.id) ?? '',
         tagSlugs: post?.tags?.map(t => t.slug) ?? [],
         categorySlugs: post?.categories?.map(c => c.slug) ?? [],
         singletonNames: [],

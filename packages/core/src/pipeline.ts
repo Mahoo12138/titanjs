@@ -18,11 +18,15 @@ export class Pipeline<Ctx> implements IPipeline<Ctx> {
   private _timings: MiddlewareTiming[] = []
   private _debug = false
 
+  // Pre-compiled dispatch function (invalidated on use())
+  private _compiled: ((ctx: Ctx) => Promise<void>) | null = null
+
   /**
    * Enable debug mode to record per-middleware timing.
    */
   enableDebug(enabled = true): this {
     this._debug = enabled
+    this._compiled = null
     return this
   }
 
@@ -44,14 +48,19 @@ export class Pipeline<Ctx> implements IPipeline<Ctx> {
   use(middleware: Middleware<Ctx>): this {
     const name = middleware.name || `middleware[${this.middlewares.length}]`
     this.middlewares.push({ fn: middleware, name })
+    this._compiled = null // invalidate pre-compiled function
     return this
   }
 
   async run(ctx: Ctx): Promise<void> {
     if (this._debug) {
+      // Debug mode always rebuilds to capture per-call timing
       await composeWithTiming(this.middlewares, this._timings)(ctx)
     } else {
-      await compose(this.middlewares.map(m => m.fn))(ctx)
+      if (!this._compiled) {
+        this._compiled = compose(this.middlewares.map(m => m.fn))
+      }
+      await this._compiled(ctx)
     }
   }
 }

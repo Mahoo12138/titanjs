@@ -26,12 +26,15 @@ import {
   collectAffectedRoutes,
   type RouteDependencyIndex,
 } from './dependency-tracker.js'
+import { LRUCache } from './lru-cache.js'
 
 export interface DevSessionOptions {
   rootDir: string
   config: TitanConfig
   /** Enable debug logging to console */
   debug?: boolean
+  /** Maximum number of rendered pages to keep in memory (default: 500) */
+  renderCacheSize?: number
 }
 
 export interface FileChangeResult {
@@ -78,8 +81,8 @@ export class DevSession {
   // File path → entry ID (built from LoadContexts)
   private fileToEntryId: Map<string, string> = new Map()
 
-  // Route URL → rendered HTML cache (invalidated per-route)
-  private renderCache: Map<string, string> = new Map()
+  // Route URL → rendered HTML cache (LRU, invalidated per-route)
+  private renderCache: LRUCache<string, string>
 
   // Observability
   private debug: boolean
@@ -96,6 +99,7 @@ export class DevSession {
 
   constructor(options: DevSessionOptions) {
     this.debug = options.debug ?? false
+    this.renderCache = new LRUCache(options.renderCacheSize ?? 500)
     this.engine = new Engine({
       rootDir: options.rootDir,
       config: options.config,
