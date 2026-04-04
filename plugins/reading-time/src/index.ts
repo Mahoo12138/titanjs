@@ -14,6 +14,7 @@
  *   })
  */
 import type { PluginDefinition, TransformContext } from '@titan/types'
+import { setEntryData } from '@titan/types'
 
 export interface ReadingTimeOptions {
   /** Words per minute for Latin text (default: 200) */
@@ -22,6 +23,13 @@ export interface ReadingTimeOptions {
   cjkCharactersPerMinute?: number
   /** Minimum reading time in minutes (default: 1) */
   minTime?: number
+}
+
+// Declaration merging: register readingTime field on entries
+declare module '@titan/types' {
+  interface EntryExtensions {
+    readingTime: number
+  }
 }
 
 export function pluginReadingTime(options: ReadingTimeOptions = {}): PluginDefinition {
@@ -49,7 +57,7 @@ export function pluginReadingTime(options: ReadingTimeOptions = {}): PluginDefin
         })
 
         // Update entry's readingTime
-        ;(ctx.entry as any).readingTime = minutes
+        setEntryData(ctx.entry, 'readingTime', minutes)
       },
     },
   }
