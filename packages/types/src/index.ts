@@ -3,6 +3,16 @@
 // JSX custom-element support (catch-all for arbitrary HTML element names in JSX)
 import './jsx-custom-elements.js'
 
+// Error types
+export {
+  TitanError,
+  ConfigError,
+  PluginError,
+  ThemeError,
+  BuildError,
+  ValidationError,
+} from './errors.js'
+
 export type {
   Middleware,
   Pipeline,
@@ -24,7 +34,10 @@ export type {
   AlternateLink,
   Collection,
   SiteData,
+  EntryExtensions,
 } from './content.js'
+
+export { setEntryData, getEntryData } from './content.js'
 
 export type {
   Route,
@@ -39,6 +52,7 @@ export type {
   ThemeReference,
   PluginDefinition,
   PluginHooks,
+  PluginSetupContext,
   UserConfig,
 } from './config.js'
 
@@ -64,6 +78,7 @@ export type {
   SiteTree,
   WidgetsConfig,
   WidgetMap,
+  WidgetRegistry,
 } from './widget.js'
 export { defineWidget } from './widget.js'
 
@@ -75,6 +90,7 @@ export type {
   ResolvedTheme,
   ResolvedStyleOutput,
   LayoutModule,
+  LayoutProps,
   SiteContext,
   PageContext,
   PostContext,

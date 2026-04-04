@@ -11,7 +11,7 @@
 import type { z } from 'zod'
 import type { BaseEntry, Post, Page, SiteData, Collection, Tag, Category, Heading } from './content.js'
 import type { Route, Pagination } from './route.js'
-import type { WidgetDefinition, SiteTree, WidgetsConfig } from './widget.js'
+import type { WidgetDefinition, SiteTree, WidgetsConfig, WidgetRegistry } from './widget.js'
 
 // ── Theme Definition ──
 
@@ -79,6 +79,8 @@ export interface ResolvedTheme {
   typeLayoutMap: Record<string, string>
   /** Theme root directory */
   rootDir: string
+  /** Widget registry for sidebar resolution */
+  widgetRegistry?: WidgetRegistry
   /** Inlined CSS from the theme's style.css (legacy, used as fallback) */
   styles?: string
   /** Processed style layers from the 5-layer system */
@@ -93,9 +95,12 @@ export interface ResolvedStyleOutput {
   warnings: string[]
 }
 
+/** Union of all page context types that layouts can receive */
+export type LayoutProps = PageContext | PostContext | PageLayoutContext | ListContext | CollectionItemContext
+
 export interface LayoutModule {
-  /** The default export is a Preact component */
-  default: (props: any) => any
+  /** The default export is a Preact component that receives a page context */
+  default: (props: LayoutProps) => any
 }
 
 // ── Page Contexts ──

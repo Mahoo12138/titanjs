@@ -101,6 +101,23 @@ export interface PluginDefinition {
   rehypePlugins?: unknown[]
   /** Global CSS to inject into every page (unscoped, for generated class names) */
   globalStyles?: string
+  /**
+   * Optional lifecycle: called once during Engine.init() after plugin registration.
+   * Use for resource initialization (HTTP clients, file watchers, etc.)
+   */
+  setup?: (context: PluginSetupContext) => Promise<void> | void
+  /**
+   * Optional lifecycle: called during Engine.clean() for cleanup.
+   * Use for releasing resources acquired in setup().
+   */
+  teardown?: () => Promise<void> | void
+}
+
+export interface PluginSetupContext {
+  /** Project root directory */
+  rootDir: string
+  /** Resolved config */
+  config: TitanConfig
 }
 
 export interface PluginHooks {

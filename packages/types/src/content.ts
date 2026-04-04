@@ -2,6 +2,46 @@
  * Content data model types
  */
 
+// ── Plugin Data Extensions ──
+
+/**
+ * Plugins extend this interface via TypeScript Declaration Merging
+ * to register their entry data fields with type safety.
+ *
+ * Example (in a plugin):
+ *   declare module '@titan/types' {
+ *     interface EntryExtensions {
+ *       toc: TocItem[]
+ *       readingTime: number
+ *     }
+ *   }
+ *
+ * Then plugins can use `setEntryData(ctx.entry, 'toc', tree)` instead of `(ctx.entry as any).toc = tree`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface EntryExtensions {}
+
+/**
+ * Set a plugin-provided data field on an entry (type-safe).
+ */
+export function setEntryData<K extends keyof EntryExtensions>(
+  entry: BaseEntry,
+  key: K,
+  value: EntryExtensions[K],
+): void {
+  ;(entry as any)[key] = value
+}
+
+/**
+ * Get a plugin-provided data field from an entry (type-safe).
+ */
+export function getEntryData<K extends keyof EntryExtensions>(
+  entry: BaseEntry,
+  key: K,
+): EntryExtensions[K] | undefined {
+  return (entry as any)[key]
+}
+
 // ── Base Entry ──
 
 export interface BaseEntry {
@@ -27,6 +67,8 @@ export interface BaseEntry {
   url: string
   /** Resolved assets after Vite processing */
   assets: ResolvedAsset[]
+  /** Absolute path to the source file (for file→entry mapping) */
+  sourceFilePath?: string
 }
 
 // ── Built-in Post ──

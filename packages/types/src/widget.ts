@@ -106,6 +106,34 @@ export type WidgetsConfig = Record<string, Record<string, unknown>>
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface WidgetMap {}
 
+// ── Widget Registry interface ──
+
+/**
+ * Interface for the widget registry, used as a contract between core and types.
+ * The concrete implementation lives in @titan/core.
+ */
+export interface WidgetRegistry {
+  get(name: string): WidgetDefinition<any> | undefined
+  has(name: string): boolean
+  getAll(): WidgetDefinition<any>[]
+  resolveSidebar(
+    side: 'leftbar' | 'rightbar',
+    layoutType: string,
+    frontmatterOverride?: SidebarConfig,
+  ): string[]
+  resolveWidgetConfig(
+    widgetName: string,
+    overrides?: Record<string, unknown>,
+  ): unknown
+  buildWidgetContext(
+    widgetName: string,
+    siteContext: WidgetSiteContext,
+    route: Route,
+    entry?: BaseEntry,
+    configOverrides?: Record<string, unknown>,
+  ): WidgetContext<any> | null
+}
+
 // ── Helper function ──
 
 export function defineWidget<TConfig = unknown>(
