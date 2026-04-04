@@ -61,6 +61,9 @@ export function buildExecutionPlan(plugins: PluginDefinition[]): ExecutionPlan {
     }
   }
 
+  // Validate: warn about unresolved inject dependencies
+  validateInjections(nodes, producerMap)
+
   // Detect cycles
   detectCycles(nodes)
 
@@ -68,6 +71,34 @@ export function buildExecutionPlan(plugins: PluginDefinition[]): ExecutionPlan {
   const tiers = topologicalTiers(nodes)
 
   return { tiers, graph: nodes }
+}
+
+/**
+ * Validate that all injected keys have a known producer.
+ * Built-in keys (like 'post.html') are allowed without a producer.
+ * Unresolved keys produce a warning so plugin authors can fix their declarations.
+ */
+function validateInjections(
+  nodes: PluginNode[],
+  producerMap: Map<string, number>,
+): void {
+  // Built-in data keys that don't need a plugin producer
+  const builtinKeys = new Set([
+    'post.html', 'post.frontmatter', 'post.content',
+    'page.html', 'page.frontmatter', 'page.content',
+    'entry.html', 'entry.frontmatter', 'entry.content',
+  ])
+
+  for (const node of nodes) {
+    for (const key of node.inject) {
+      if (!producerMap.has(key) && !builtinKeys.has(key)) {
+        console.warn(
+          `[ioc] Plugin "${node.plugin.name}" injects "${key}" but no plugin produces it. ` +
+          `Ensure a plugin declares produces: ['${key}'] or remove the injection.`,
+        )
+      }
+    }
+  }
 }
 
 /**

@@ -7,16 +7,52 @@
  */
 import type { Middleware, Pipeline as IPipeline } from '@titan/types'
 
+/** Timing entry for a single middleware execution */
+export interface MiddlewareTiming {
+  name: string
+  durationMs: number
+}
+
 export class Pipeline<Ctx> implements IPipeline<Ctx> {
-  private middlewares: Middleware<Ctx>[] = []
+  private middlewares: Array<{ fn: Middleware<Ctx>; name: string }> = []
+  private _timings: MiddlewareTiming[] = []
+  private _debug = false
+
+  /**
+   * Enable debug mode to record per-middleware timing.
+   */
+  enableDebug(enabled = true): this {
+    this._debug = enabled
+    return this
+  }
+
+  /**
+   * Get recorded timings (only populated when debug is enabled).
+   * Call clearTimings() before a run to get timings for just that run.
+   */
+  get timings(): readonly MiddlewareTiming[] {
+    return this._timings
+  }
+
+  /**
+   * Clear accumulated timing data.
+   */
+  clearTimings(): void {
+    this._timings = []
+  }
 
   use(middleware: Middleware<Ctx>): this {
-    this.middlewares.push(middleware)
+    const name = middleware.name || `middleware[${this.middlewares.length}]`
+    this.middlewares.push({ fn: middleware, name })
     return this
   }
 
   async run(ctx: Ctx): Promise<void> {
-    await compose(this.middlewares)(ctx)
+    if (this._debug) {
+      await composeWithTiming(this.middlewares, this._timings)(ctx)
+    } else {
+      await compose(this.middlewares.map(m => m.fn))(ctx)
+    }
   }
 }
 
@@ -39,6 +75,36 @@ function compose<Ctx>(middlewares: Middleware<Ctx>[]): (ctx: Ctx) => Promise<voi
       if (!fn) return
 
       await fn(ctx, () => dispatch(i + 1))
+    }
+
+    await dispatch(0)
+  }
+}
+
+/**
+ * Compose with per-middleware timing measurement.
+ */
+function composeWithTiming<Ctx>(
+  middlewares: Array<{ fn: Middleware<Ctx>; name: string }>,
+  timings: MiddlewareTiming[],
+): (ctx: Ctx) => Promise<void> {
+  return async (ctx: Ctx) => {
+    let index = -1
+
+    async function dispatch(i: number): Promise<void> {
+      if (i <= index) {
+        throw new Error('next() called multiple times')
+      }
+      index = i
+
+      const entry = middlewares[i]
+      if (!entry) return
+
+      const start = performance.now()
+      await entry.fn(ctx, () => dispatch(i + 1))
+      const elapsed = performance.now() - start
+
+      timings.push({ name: entry.name, durationMs: Math.round(elapsed * 100) / 100 })
     }
 
     await dispatch(0)

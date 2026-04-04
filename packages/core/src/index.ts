@@ -2,10 +2,11 @@
 
 // Phase 1
 export { Pipeline, compose } from './pipeline.js'
+export type { MiddlewareTiming } from './pipeline.js'
 export { loadSourceFiles, loadFile } from './loader.js'
 export { createMarkdownProcessor, transformEntry } from './transformer.js'
 export { buildSiteData, generateRoutes, buildGenerateContext } from './generator.js'
-export { emitRoutes } from './emitter.js'
+export { emitRoutes, renderRoutes } from './emitter.js'
 export { defineConfig, loadConfig } from './config.js'
 export { FileSystemCache } from './cache.js'
 export { Engine } from './engine.js'
@@ -29,11 +30,20 @@ export type { DevSessionOptions, FileChangeResult, DevSessionStats } from './dev
 // Widget system
 export { WidgetRegistry } from './widget-registry.js'
 
+// Extracted managers
+export { PluginManager } from './plugin-manager.js'
+export type { Pipelines } from './plugin-manager.js'
+export { StyleManager } from './style-manager.js'
+
+// Event system
+export { TitanEventEmitter } from './event-emitter.js'
+export type { TitanEventMap, TitanEventName, TitanEventHandler } from './event-emitter.js'
+
 // Phase 3 - Theme system
 export { loadTheme, resolveLayout } from './theme-loader.js'
 export { renderLayout, Slot, buildHtmlDocument } from './renderer.js'
 export type { IslandInstance, RenderResult } from './renderer.js'
-export { emitRoutesWithTheme } from './theme-emitter.js'
+export { emitRoutesWithTheme, renderRoutesWithTheme } from './theme-emitter.js'
 export type { ThemeEmitterOptions } from './theme-emitter.js'
 
 // Phase 4 - Style system

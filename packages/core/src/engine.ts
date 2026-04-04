@@ -31,16 +31,17 @@ import { Pipeline } from './pipeline.js'
 import { loadSourceFiles, loadFile } from './loader.js'
 import { createMarkdownProcessor, transformEntry } from './transformer.js'
 import { buildSiteData, generateRoutes, createCollection } from './generator.js'
-import { emitRoutes } from './emitter.js'
-import { emitRoutesWithTheme } from './theme-emitter.js'
+import { emitRoutes, renderRoutes } from './emitter.js'
+import { emitRoutesWithTheme, renderRoutesWithTheme } from './theme-emitter.js'
 import { loadTheme } from './theme-loader.js'
 import { FileSystemCache } from './cache.js'
 import { CollectionRegistry } from './collection-registry.js'
 import { SingletonRegistry } from './singleton-registry.js'
 import { WidgetRegistry } from './widget-registry.js'
-import { buildExecutionPlan, executePluginPlan } from './ioc.js'
 import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
-import { buildStyles } from './styles.js'
+import { PluginManager } from './plugin-manager.js'
+import { StyleManager } from './style-manager.js'
+import { TitanEventEmitter } from './event-emitter.js'
 
 export interface EngineOptions {
   /** Project root directory (absolute) */
@@ -87,6 +88,13 @@ export class Engine {
   readonly widgets = new WidgetRegistry()
   private depTracker: DependencyTracker
 
+  // Extracted managers
+  readonly pluginManager: PluginManager
+  private styleManager = new StyleManager()
+
+  // Event bus for lifecycle notifications
+  readonly events = new TitanEventEmitter()
+
   // Pipeline stages
   readonly loadPipeline = new Pipeline<LoadContext>()
   readonly transformPipeline = new Pipeline<TransformContext>()
@@ -101,6 +109,7 @@ export class Engine {
     this.rootDir = options.rootDir
     this.config = options.config
     this.noCache = options.noCache ?? false
+    this.pluginManager = new PluginManager(options.config.plugins)
 
     const cacheDir = path.join(this.rootDir, options.config.build.cacheDir)
     this.cache = new FileSystemCache(cacheDir)
@@ -129,13 +138,18 @@ export class Engine {
     }
 
     // Register plugin collections/singletons/widgets
-    this.registerPluginContent()
+    this.pluginManager.registerContent(this.collections, this.singletons)
 
-    // IoC - build execution plan and validate
-    buildExecutionPlan(this.config.plugins)
+    // IoC - build execution plan, validate deps, register hooks in tier order
+    this.pluginManager.buildPlanAndRegisterHooks({
+      load: this.loadPipeline,
+      transform: this.transformPipeline,
+      generate: this.generatePipeline,
+      emit: this.emitPipeline,
+    })
 
-    // Register plugin hooks (respecting DAG order)
-    this.registerPluginHooks()
+    // Run plugin setup lifecycle hooks
+    await this.pluginManager.runSetup({ rootDir: this.rootDir, config: this.config })
 
     // Build merged markdown config and processor
     this.mergedMarkdown = this.buildMergedMarkdown()
@@ -154,6 +168,8 @@ export class Engine {
    * Stage 1: Load all source files and resolve singletons
    */
   async loadAll(): Promise<LoadResult> {
+    this.events.emit('load:start', { sourceDir: this.sourceDir })
+
     // Resolve singletons
     const singletonData = await this.singletons.resolveAll(this.rootDir)
 
@@ -173,10 +189,14 @@ export class Engine {
       loadContexts.push(...collectionContexts)
     }
 
-    // Run load pipeline on each context
-    for (const ctx of loadContexts) {
-      await this.loadPipeline.run(ctx)
+    // Run load pipeline on each context (with concurrency)
+    const concurrency = this.config.build.concurrency
+    for (let i = 0; i < loadContexts.length; i += concurrency) {
+      const batch = loadContexts.slice(i, i + concurrency)
+      await Promise.all(batch.map(ctx => this.loadPipeline.run(ctx)))
     }
+
+    this.events.emit('load:complete', { fileCount: loadContexts.length })
 
     return { loadContexts, singletonData }
   }
@@ -185,6 +205,8 @@ export class Engine {
    * Stage 2: Transform loaded contexts into entries (with concurrency + cache)
    */
   async transformAll(loadContexts: LoadContext[]): Promise<TransformResult> {
+    this.events.emit('transform:start', { entryCount: loadContexts.length })
+
     const processor = this.processor!
     const concurrency = this.config.build.concurrency
     const entries: BaseEntry[] = []
@@ -196,6 +218,8 @@ export class Engine {
       )
       entries.push(...results)
     }
+
+    this.events.emit('transform:complete', { entryCount: entries.length })
 
     return { entries }
   }
@@ -230,6 +254,11 @@ export class Engine {
       await this.cache.set(loadCtx.filePath, transformCtx.entry)
     }
 
+    this.events.emit('entry:transformed', {
+      entryId: transformCtx.entry.id,
+      contentType: transformCtx.entry.contentType,
+    })
+
     return transformCtx.entry
   }
 
@@ -240,11 +269,13 @@ export class Engine {
     entries: BaseEntry[],
     singletonData: Map<string, unknown>,
   ): Promise<GenerateResult> {
+    this.events.emit('generate:start', {})
+
     const siteData = buildSiteData(entries)
 
     // Inject singleton data into siteData
     for (const [name, data] of singletonData) {
-      (siteData as any)[name] = data
+      siteData[name] = data
     }
 
     const routes = generateRoutes(siteData)
@@ -252,7 +283,7 @@ export class Engine {
     // Generate routes for custom collections
     for (const def of this.collections.getAll()) {
       const collectionEntries = entries.filter(e => e.contentType === def.name)
-      ;(siteData as any)[def.name] = createCollection(def.name, collectionEntries)
+      siteData[def.name] = createCollection(def.name, collectionEntries)
       const collectionRoutes = this.collections.generateRoutes(def.name, collectionEntries)
       routes.push(...collectionRoutes)
     }
@@ -264,6 +295,8 @@ export class Engine {
     if (!this.noCache) {
       this.recordDependencies(siteData, entries)
     }
+
+    this.events.emit('generate:complete', { routeCount: generateCtx.routes.length })
 
     return { siteData, routes: generateCtx.routes, generateCtx }
   }
@@ -290,35 +323,17 @@ export class Engine {
         this.widgets.setWidgetsConfig(theme.definition.widgetsConfig)
       }
       // Attach widget registry to theme for renderer access
-      ;(theme as any).widgetRegistry = this.widgets
+      theme.widgetRegistry = this.widgets
 
-      // Build styles
-      const resolvedStyles = await buildStyles({
-        themeDir: theme.rootDir,
-        themeName: theme.definition.name,
-        plugins: this.config.plugins.map(p => ({
-          name: p.name,
-          globalStyles: p.globalStyles,
-          slotStyles: undefined,
-        })),
-        userStyles: this.config.styles?.tokens || this.config.styles?.global
-          ? {
-              tokens: this.config.styles.tokens,
-              global: this.config.styles.global,
-            }
-          : undefined,
-        rootDir: this.rootDir,
-      })
+      // Build styles via StyleManager
+      await this.styleManager.buildThemeStyles(
+        theme,
+        this.pluginManager.getPlugins(),
+        this.config,
+        this.rootDir,
+      )
 
-      for (const warning of resolvedStyles.warnings) {
-        console.warn(`[style] ${warning}`)
-      }
-
-      theme.resolvedStyles = {
-        css: resolvedStyles.css,
-        warnings: resolvedStyles.warnings,
-      }
-      theme.styles = resolvedStyles.css
+      this.events.emit('theme:loaded', { themeName: theme.definition.name })
     }
 
     return { theme }
@@ -326,11 +341,16 @@ export class Engine {
 
   /**
    * Stage 4: Emit routes to disk
+   *
+   * Flow: render HTML → run emit pipeline hooks → write to disk.
+   * This ensures hooks can modify HTML before it hits the file system.
    */
   async emit(
     generateCtx: GenerateContext,
     theme: ResolvedTheme | null,
   ): Promise<EmitContext[]> {
+    this.events.emit('emit:start', { routeCount: generateCtx.routes.length })
+
     const outDir = path.join(this.rootDir, this.config.build.outDir)
     const siteConfig = {
       title: this.config.title,
@@ -338,27 +358,32 @@ export class Engine {
       language: this.config.language,
     }
 
+    // Step 1: Render all routes to HTML (no disk I/O)
     const emitContexts = theme
-      ? await emitRoutesWithTheme(
+      ? await renderRoutesWithTheme(
           generateCtx.routes,
           generateCtx.siteData,
           { outDir, siteConfig, theme },
         )
-      : await emitRoutes(
+      : await renderRoutes(
           generateCtx.routes,
           generateCtx.siteData,
           { outDir, siteConfig },
         )
 
-    // Run emit pipeline on each context, then re-write if modified
+    // Step 2: Run emit pipeline on each context (hooks can modify html)
     for (const ctx of emitContexts) {
-      const originalHtml = ctx.html
       await this.emitPipeline.run(ctx)
-      if (ctx.html !== originalHtml) {
-        await fs.mkdir(path.dirname(ctx.outputPath), { recursive: true })
-        await fs.writeFile(ctx.outputPath, ctx.html, 'utf-8')
-      }
     }
+
+    // Step 3: Write all (possibly modified) HTML to disk
+    for (const ctx of emitContexts) {
+      await fs.mkdir(path.dirname(ctx.outputPath), { recursive: true })
+      await fs.writeFile(ctx.outputPath, ctx.html, 'utf-8')
+      this.events.emit('route:emitted', { url: ctx.route.url, outputPath: ctx.outputPath })
+    }
+
+    this.events.emit('emit:complete', { routeCount: emitContexts.length })
 
     return emitContexts
   }
@@ -379,14 +404,14 @@ export class Engine {
       language: this.config.language,
     }
 
-    // Render the single route using the same theme emitter path
+    // Render without writing to disk
     const emitContexts = theme
-      ? await emitRoutesWithTheme(
+      ? await renderRoutesWithTheme(
           [route],
           siteData,
           { outDir, siteConfig, theme },
         )
-      : await emitRoutes(
+      : await renderRoutes(
           [route],
           siteData,
           { outDir, siteConfig },
@@ -404,6 +429,7 @@ export class Engine {
    */
   async build(): Promise<BuildResult> {
     const startTime = Date.now()
+    this.events.emit('build:start', { rootDir: this.rootDir })
 
     await this.init()
 
@@ -422,6 +448,12 @@ export class Engine {
     const elapsed = Date.now() - startTime
     const outDir = path.join(this.rootDir, this.config.build.outDir)
 
+    this.events.emit('build:complete', {
+      entries: entries.length,
+      routes: generateCtx.routes.length,
+      elapsed,
+    })
+
     return {
       entries: entries.length,
       routes: generateCtx.routes.length,
@@ -431,9 +463,12 @@ export class Engine {
   }
 
   /**
-   * Clean cache and output directories
+   * Clean cache and output directories, run plugin teardown
    */
   async clean(): Promise<void> {
+    // Run plugin teardown lifecycle hooks
+    await this.pluginManager.runTeardown()
+
     await this.cache.clear()
     const outDir = path.join(this.rootDir, this.config.build.outDir)
     const { rm } = await import('node:fs/promises')
@@ -445,18 +480,13 @@ export class Engine {
    */
   private buildMergedMarkdown() {
     const mergedMarkdown = { ...this.config.markdown }
-    const extraRemark: unknown[] = []
-    const extraRehype: unknown[] = []
-    for (const plugin of this.config.plugins) {
-      if (plugin.remarkPlugins) extraRemark.push(...plugin.remarkPlugins)
-      if (plugin.rehypePlugins) extraRehype.push(...plugin.rehypePlugins)
-    }
+    const { remarkPlugins, rehypePlugins } = this.pluginManager.collectMarkdownPlugins()
     mergedMarkdown.remarkPlugins = [
-      ...extraRemark,
+      ...remarkPlugins,
       ...(mergedMarkdown.remarkPlugins ?? []),
     ]
     mergedMarkdown.rehypePlugins = [
-      ...extraRehype,
+      ...rehypePlugins,
       ...(mergedMarkdown.rehypePlugins ?? []),
     ]
     return mergedMarkdown
@@ -491,46 +521,15 @@ export class Engine {
     this.depTracker.recordCategoryCounts(catCounts)
 
     for (const entry of entries) {
-      const post = entry as any
+      const isPost = entry.contentType === 'post'
+      const post = isPost ? (entry as import('@titan/types').Post) : null
       this.depTracker.recordEntry(entry.id, {
         fileHash: '',
-        tagSlugs: (post.tags ?? []).map((t: any) => t.slug),
-        categorySlugs: (post.categories ?? []).map((c: any) => c.slug),
+        tagSlugs: post?.tags?.map(t => t.slug) ?? [],
+        categorySlugs: post?.categories?.map(c => c.slug) ?? [],
         singletonNames: [],
         layoutName: '',
       })
-    }
-  }
-
-  /**
-   * Register collections and singletons from plugins
-   */
-  private registerPluginContent(): void {
-    for (const plugin of this.config.plugins) {
-      for (const col of plugin.collections ?? []) {
-        this.collections.register(col)
-      }
-      for (const s of plugin.singletons ?? []) {
-        this.singletons.register(s)
-      }
-    }
-  }
-
-  /**
-   * Register plugin hooks into pipelines
-   */
-  private registerPluginHooks(): void {
-    for (const plugin of this.config.plugins) {
-      if (!plugin.hooks) continue
-
-      if (plugin.hooks['load:before']) this.loadPipeline.use(plugin.hooks['load:before'])
-      if (plugin.hooks['load:after']) this.loadPipeline.use(plugin.hooks['load:after'])
-      if (plugin.hooks['transform:entry']) this.transformPipeline.use(plugin.hooks['transform:entry'])
-      if (plugin.hooks['generate:before']) this.generatePipeline.use(plugin.hooks['generate:before'])
-      if (plugin.hooks['generate:routes']) this.generatePipeline.use(plugin.hooks['generate:routes'])
-      if (plugin.hooks['generate:after']) this.generatePipeline.use(plugin.hooks['generate:after'])
-      if (plugin.hooks['emit:before']) this.emitPipeline.use(plugin.hooks['emit:before'])
-      if (plugin.hooks['emit:after']) this.emitPipeline.use(plugin.hooks['emit:after'])
     }
   }
 }

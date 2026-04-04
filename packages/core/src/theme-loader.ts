@@ -73,7 +73,8 @@ export async function loadTheme(
   }
 
   // Load layouts
-  const layouts = await loadLayouts(effectiveDir, importFn)
+  const useBatchImport = !importer // Use batch when using default importer
+  const layouts = await loadLayouts(effectiveDir, importFn, useBatchImport)
 
   // Build type → layout map
   const typeLayoutMap: Record<string, string> = {
@@ -256,6 +257,75 @@ async function defaultImport(filePath: string): Promise<any> {
 }
 
 /**
+ * Batch-compile multiple files with a single esbuild invocation.
+ * Returns a Map from original file path to the compiled module.
+ * Files that don't need esbuild (plain .js) are imported directly.
+ */
+async function batchImport(filePaths: string[]): Promise<Map<string, any>> {
+  const results = new Map<string, any>()
+  const needsEsbuild: string[] = []
+  const directImports: string[] = []
+
+  for (const fp of filePaths) {
+    const ext = path.extname(fp)
+    if (['.jsx', '.tsx', '.ts', '.mjs'].includes(ext)) {
+      needsEsbuild.push(fp)
+    } else {
+      directImports.push(fp)
+    }
+  }
+
+  // Import plain .js files directly (in parallel)
+  const directResults = await Promise.all(
+    directImports.map(async (fp) => {
+      const url = pathToFileURL(fp).href
+      const mod = await import(url)
+      return [fp, mod] as const
+    }),
+  )
+  for (const [fp, mod] of directResults) {
+    results.set(fp, mod)
+  }
+
+  // Batch compile all esbuild-requiring files in one call
+  if (needsEsbuild.length > 0) {
+    const { build } = await import('esbuild')
+    const tmpDir = path.join(path.dirname(needsEsbuild[0]), '.titan-tmp-' + Date.now())
+    await fs.mkdir(tmpDir, { recursive: true })
+    try {
+      await build({
+        entryPoints: needsEsbuild,
+        outdir: tmpDir,
+        bundle: true,
+        format: 'esm',
+        jsx: 'automatic',
+        jsxImportSource: 'preact',
+        target: 'es2022',
+        packages: 'external',
+        outExtension: { '.js': '.mjs' },
+      })
+      // Import each compiled output
+      const importPromises = needsEsbuild.map(async (fp) => {
+        const baseName = path.basename(fp, path.extname(fp))
+        const outFile = path.join(tmpDir, baseName + '.mjs')
+        const url = pathToFileURL(outFile).href + '?t=' + Date.now()
+        const mod = await import(url)
+        return [fp, mod] as const
+      })
+      const compiled = await Promise.all(importPromises)
+      for (const [fp, mod] of compiled) {
+        results.set(fp, mod)
+      }
+    } finally {
+      // Clean up temp directory
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+    }
+  }
+
+  return results
+}
+
+/**
  * Load theme.config.ts / theme.config.js
  */
 async function loadThemeDefinition(
@@ -280,10 +350,12 @@ async function loadThemeDefinition(
 
 /**
  * Discover and load all layout modules from themes/layouts/
+ * When using the default importer, batch-compiles all layouts in a single esbuild call.
  */
 async function loadLayouts(
   themeDir: string,
   importFn: (path: string) => Promise<any>,
+  useBatchImport: boolean = false,
 ): Promise<Map<string, LayoutModule>> {
   const layouts = new Map<string, LayoutModule>()
   const layoutDir = path.join(themeDir, 'layouts')
@@ -291,17 +363,32 @@ async function loadLayouts(
   if (!await exists(layoutDir)) return layouts
 
   const entries = await fs.readdir(layoutDir, { withFileTypes: true })
+  const layoutFiles: Array<{ name: string; filePath: string }> = []
 
   for (const entry of entries) {
     if (!entry.isFile()) continue
     const ext = path.extname(entry.name)
     if (!['.tsx', '.jsx', '.js', '.mjs'].includes(ext)) continue
 
-    const name = path.basename(entry.name, ext)
-    const filePath = path.join(layoutDir, entry.name)
-    const mod = await importFn(filePath)
+    layoutFiles.push({
+      name: path.basename(entry.name, ext),
+      filePath: path.join(layoutDir, entry.name),
+    })
+  }
 
-    layouts.set(name, { default: mod.default })
+  if (useBatchImport && layoutFiles.length > 0) {
+    // Batch compile all layouts in a single esbuild call
+    const modules = await batchImport(layoutFiles.map((f) => f.filePath))
+    for (const { name, filePath } of layoutFiles) {
+      const mod = modules.get(filePath)
+      if (mod) layouts.set(name, { default: mod.default })
+    }
+  } else {
+    // Use provided import function (e.g. in tests)
+    for (const { name, filePath } of layoutFiles) {
+      const mod = await importFn(filePath)
+      layouts.set(name, { default: mod.default })
+    }
   }
 
   return layouts

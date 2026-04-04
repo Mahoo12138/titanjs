@@ -14,6 +14,7 @@ import path from 'node:path'
 import type {
   TitanConfig,
   BaseEntry,
+  Post,
   Route,
   SiteData,
   ResolvedTheme,
@@ -134,18 +135,11 @@ export class DevSession {
     const { entries } = await this.engine.transformAll(loadContexts)
     this.entries = entries
 
-    // Build file → entry mapping from loadContexts
+    // Build file → entry mapping using sourceFilePath
     this.fileToEntryId.clear()
-    for (const ctx of loadContexts) {
-      // Derive slug the same way transformer does (filename without date prefix)
-      const entry = entries.find(e => {
-        // Match by comparing the slug with the filename
-        const basename = ctx.filePath.split('/').pop()?.replace(/\.md$/, '') ?? ''
-        const slugFromFile = basename.replace(/^\d{4}-\d{2}-\d{2}-/, '')
-        return e.slug === slugFromFile || e.id === slugFromFile
-      })
-      if (entry) {
-        this.fileToEntryId.set(ctx.filePath, entry.id)
+    for (const entry of entries) {
+      if (entry.sourceFilePath) {
+        this.fileToEntryId.set(entry.sourceFilePath, entry.id)
       }
     }
 
@@ -174,6 +168,23 @@ export class DevSession {
    */
   getRouteForUrl(url: string): Route | undefined {
     return this.urlToRoute.get(url)
+  }
+
+  /**
+   * Reload the theme (layouts, styles, widgets) and invalidate all render caches.
+   * Called when theme files (layouts, styles, config) change during dev.
+   */
+  async reloadTheme(): Promise<{ invalidatedRoutes: string[] }> {
+    const { theme } = await this.engine.resolveTheme()
+    this.theme = theme
+
+    // Invalidate all render caches since layouts/styles may have changed
+    const invalidatedRoutes = Array.from(this.renderCache.keys())
+    this.renderCache.clear()
+
+    this.logDebug(`theme reloaded, invalidated ${invalidatedRoutes.length} cached routes`)
+
+    return { invalidatedRoutes }
   }
 
   /**
@@ -234,9 +245,10 @@ export class DevSession {
     const previousIndex = this.routeIndex
 
     // Snapshot old frontmatter for diff
-    const oldEntry = this.entries.find(e => e.id === trackedEntryId) as any
-    const oldTagSlugs = (oldEntry?.tags ?? []).map((t: any) => t.slug)
-    const oldCatSlugs = (oldEntry?.categories ?? []).map((c: any) => c.slug)
+    const oldEntry = this.entries.find(e => e.id === trackedEntryId)
+    const oldPost = oldEntry?.contentType === 'post' ? (oldEntry as Post) : null
+    const oldTagSlugs = oldPost?.tags?.map(t => t.slug) ?? []
+    const oldCatSlugs = oldPost?.categories?.map(c => c.slug) ?? []
 
     // Determine content type of existing entry
     const contentType = oldEntry?.contentType ?? 'post'
@@ -254,15 +266,22 @@ export class DevSession {
     this.fileToEntryId.set(filePath, nextEntryId)
 
     // Detect frontmatter changes
-    const newTagSlugs = ((newEntry as any).tags ?? []).map((t: any) => t.slug)
-    const newCatSlugs = ((newEntry as any).categories ?? []).map((c: any) => c.slug)
-    const frontmatterChanged = detectFrontmatterChange(oldEntry, newEntry)
+    const newPost = newEntry.contentType === 'post' ? (newEntry as Post) : null
+    const newTagSlugs = newPost?.tags?.map(t => t.slug) ?? []
+    const newCatSlugs = newPost?.categories?.map(c => c.slug) ?? []
+    const frontmatterChanged = detectFrontmatterChange(oldEntry ?? null, newEntry)
 
-    // Re-generate site data and routes
-    const { siteData, routes } = await this.engine.generate(this.entries, this.singletonData)
-    this.siteData = siteData
-    this.routes = routes
-    this.rebuildRouteIndex()
+    // Only rebuild SiteData and routes if frontmatter changed.
+    // Body-only edits just need the entry updated in siteData.
+    if (frontmatterChanged) {
+      const { siteData, routes } = await this.engine.generate(this.entries, this.singletonData)
+      this.siteData = siteData
+      this.routes = routes
+      this.rebuildRouteIndex()
+    } else if (this.siteData) {
+      // Body-only change: update entry in existing siteData collection
+      this.updateEntryInSiteData(newEntry)
+    }
 
     // Compute affected routes
     const affected = collectAffectedRoutes(
@@ -308,16 +327,11 @@ export class DevSession {
     const { entries } = await this.engine.transformAll(loadContexts)
     this.entries = entries
 
-    // Rebuild file → entry mapping
+    // Rebuild file → entry mapping using sourceFilePath
     this.fileToEntryId.clear()
-    for (const ctx of loadContexts) {
-      const entry = entries.find(e => {
-        const basename = ctx.filePath.split('/').pop()?.replace(/\.md$/, '') ?? ''
-        const slugFromFile = basename.replace(/^\d{4}-\d{2}-\d{2}-/, '')
-        return e.slug === slugFromFile || e.id === slugFromFile
-      })
-      if (entry) {
-        this.fileToEntryId.set(ctx.filePath, entry.id)
+    for (const entry of entries) {
+      if (entry.sourceFilePath) {
+        this.fileToEntryId.set(entry.sourceFilePath, entry.id)
       }
     }
 
@@ -351,16 +365,41 @@ export class DevSession {
     }
 
     // Build route dependency index using entries with file paths
-    const entriesWithMeta = this.entries.map(e => ({
-      id: e.id,
-      slug: e.slug,
-      contentType: e.contentType,
-      filePath: (e as any).filePath ?? undefined,
-      tags: (e as any).tags,
-      categories: (e as any).categories,
-      date: (e as any).date,
-    }))
+    const entriesWithMeta = this.entries.map(e => {
+      const post = e.contentType === 'post' ? (e as Post) : null
+      return {
+        id: e.id,
+        slug: e.slug,
+        contentType: e.contentType,
+        filePath: e.sourceFilePath,
+        tags: post?.tags,
+        categories: post?.categories,
+        date: post?.date,
+      }
+    })
     this.routeIndex = buildRouteDependencyIndex(this.routes, entriesWithMeta)
+  }
+
+  /**
+   * Update a single entry in the existing siteData without full rebuild.
+   * Used for body-only changes where tags/categories/routes don't change.
+   */
+  private updateEntryInSiteData(entry: BaseEntry): void {
+    if (!this.siteData) return
+
+    // Map content type to siteData collection key (post → posts, page → pages)
+    const collectionKey = entry.contentType === 'post' ? 'posts'
+      : entry.contentType === 'page' ? 'pages'
+      : entry.contentType
+
+    const collection = this.siteData[collectionKey]
+    if (collection && typeof collection === 'object' && 'entries' in collection) {
+      const entries = (collection as { entries: BaseEntry[] }).entries
+      const idx = entries.findIndex(e => e.id === entry.id || e.slug === entry.slug)
+      if (idx >= 0) {
+        entries[idx] = entry
+      }
+    }
   }
 
   private logDebug(message: string): void {
@@ -392,22 +431,26 @@ function normalizeFrontmatterValue(
   entry: BaseEntry,
   key: 'title' | 'date' | 'tags' | 'categories' | 'layout' | 'slug',
 ): string {
+  const post = entry.contentType === 'post' ? (entry as Post) : null
   switch (key) {
     case 'date': {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const value = (entry as any).date
+      const value = post?.date
       if (!value) return 'null'
       const date = value instanceof Date ? value : new Date(String(value))
       return Number.isNaN(date.getTime()) ? String(value) : date.toISOString()
     }
-    case 'tags':
+    case 'tags': {
+      const tags = post?.tags ?? []
+      return JSON.stringify(tags.map(t => t.slug).sort())
+    }
     case 'categories': {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const values = ((entry as any)[key] ?? []) as Array<string | { slug?: string }>
-      return JSON.stringify(values.map(value => typeof value === 'string' ? value : value.slug ?? '').sort())
+      const cats = post?.categories ?? []
+      return JSON.stringify(cats.map(c => c.slug).sort())
+    }
+    case 'title': {
+      return JSON.stringify(post?.title ?? (entry.frontmatter.title ?? null))
     }
     default:
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return JSON.stringify((entry as any)[key] ?? null)
+      return JSON.stringify(entry.frontmatter[key] ?? null)
   }
 }

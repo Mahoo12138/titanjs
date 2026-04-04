@@ -29,9 +29,10 @@ export interface ThemeEmitterOptions {
 }
 
 /**
- * Emit all routes using the theme's Preact layouts
+ * Render all routes to HTML using the theme's Preact layouts (no disk I/O).
+ * Returns EmitContexts with html populated but not written to disk.
  */
-export async function emitRoutesWithTheme(
+export async function renderRoutesWithTheme(
   routes: Route[],
   siteData: SiteData,
   options: ThemeEmitterOptions,
@@ -79,12 +80,28 @@ export async function emitRoutesWithTheme(
       })
     }
 
-    // Write output
     const outputPath = path.join(outDir, route.outputPath)
-    await fs.mkdir(path.dirname(outputPath), { recursive: true })
-    await fs.writeFile(outputPath, html, 'utf-8')
-
     contexts.push({ route, siteData, outputPath, html })
+  }
+
+  return contexts
+}
+
+/**
+ * Emit all routes using the theme's Preact layouts (render + write to disk).
+ * Kept for backward compatibility; delegates to renderRoutesWithTheme then writes.
+ */
+export async function emitRoutesWithTheme(
+  routes: Route[],
+  siteData: SiteData,
+  options: ThemeEmitterOptions,
+): Promise<EmitContext[]> {
+  const contexts = await renderRoutesWithTheme(routes, siteData, options)
+
+  // Write all rendered HTML to disk
+  for (const ctx of contexts) {
+    await fs.mkdir(path.dirname(ctx.outputPath), { recursive: true })
+    await fs.writeFile(ctx.outputPath, ctx.html, 'utf-8')
   }
 
   return contexts
@@ -102,7 +119,7 @@ function buildPageContext(
   // Inject widgetRegistry into theme config so layouts can access it
   const themeConfigWithWidgets = {
     ...theme.config,
-    __widgetRegistry: (theme as any).widgetRegistry ?? null,
+    __widgetRegistry: theme.widgetRegistry ?? null,
   }
 
   const base: PageContext = {

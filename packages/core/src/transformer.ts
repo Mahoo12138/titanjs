@@ -107,6 +107,7 @@ function buildEntry(
     path: '',
     url: '',
     assets: [],
+    sourceFilePath: filePath,
   }
 
   if (contentType === 'post') {

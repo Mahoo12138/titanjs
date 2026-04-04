@@ -7,7 +7,8 @@
  * - Collect Island components for deferred client-side hydration
  * - Generate full HTML document with Island activation scripts
  */
-import { h, type VNode, type ComponentType } from 'preact'
+import { h, type VNode, type ComponentType, createContext } from 'preact'
+import { useContext } from 'preact/hooks'
 import renderToString from 'preact-render-to-string'
 import type {
   ResolvedTheme,
@@ -36,14 +37,16 @@ export interface RenderResult {
 }
 
 /**
- * Render context passed to the Slot function during SSR.
- * This is set per-render and read by the Slot component.
+ * Render context for SSR. Passed via Preact Context instead of module-level globals
+ * to ensure safe concurrent rendering.
  */
-let currentRenderContext: {
+interface RenderContextValue {
   theme: ResolvedTheme
   islands: IslandInstance[]
   islandCounter: number
-} | null = null
+}
+
+const RenderContext = createContext<RenderContextValue | null>(null)
 
 /**
  * Slot component - renders slot components registered to the named slot
@@ -52,9 +55,10 @@ let currentRenderContext: {
  *   <Slot name="post:after-content" props={{ post, site }} />
  */
 export function Slot({ name, props }: { name: string; props?: Record<string, unknown> }): VNode | null {
-  if (!currentRenderContext) return null
+  const renderCtx = useContext(RenderContext)
+  if (!renderCtx) return null
 
-  const components = currentRenderContext.theme.slotComponents.get(name)
+  const components = renderCtx.theme.slotComponents.get(name)
   if (!components || components.length === 0) return null
 
   const children = components.map((sc, i) => {
@@ -62,8 +66,8 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
 
     // Collect island if declared
     if (sc.island) {
-      const islandId = `island-${currentRenderContext!.islandCounter++}`
-      currentRenderContext!.islands.push({
+      const islandId = `island-${renderCtx.islandCounter++}`
+      renderCtx.islands.push({
         id: islandId,
         name: sc.slot.replace(/:/g, '-'),
         activate: sc.island.activate,
@@ -94,20 +98,20 @@ export function renderLayout(
 ): RenderResult {
   const islands: IslandInstance[] = []
 
-  // Set render context for Slot component access
-  currentRenderContext = {
+  const renderCtxValue: RenderContextValue = {
     theme,
     islands,
     islandCounter: 0,
   }
 
-  try {
-    const vnode = h(layout.default, ctx)
-    const body = renderToString(vnode)
-    return { html: body, islands }
-  } finally {
-    currentRenderContext = null
-  }
+  // Wrap layout in RenderContext.Provider for Slot access
+  const vnode = h(
+    RenderContext.Provider,
+    { value: renderCtxValue },
+    h(layout.default, ctx),
+  )
+  const body = renderToString(vnode)
+  return { html: body, islands }
 }
 
 /**

@@ -18,9 +18,9 @@ export interface EmitterOptions {
 }
 
 /**
- * Emit all routes as static HTML files
+ * Render all routes to HTML (no disk I/O).
  */
-export async function emitRoutes(
+export async function renderRoutes(
   routes: Route[],
   siteData: SiteData,
   options: EmitterOptions,
@@ -31,16 +31,30 @@ export async function emitRoutes(
     const html = renderRoute(route, siteData, options.siteConfig)
     const outputPath = path.join(options.outDir, route.outputPath)
 
-    // Write output
-    await fs.mkdir(path.dirname(outputPath), { recursive: true })
-    await fs.writeFile(outputPath, html, 'utf-8')
-
     contexts.push({
       route,
       siteData,
       outputPath,
       html,
     })
+  }
+
+  return contexts
+}
+
+/**
+ * Emit all routes as static HTML files (render + write to disk).
+ */
+export async function emitRoutes(
+  routes: Route[],
+  siteData: SiteData,
+  options: EmitterOptions,
+): Promise<EmitContext[]> {
+  const contexts = await renderRoutes(routes, siteData, options)
+
+  for (const ctx of contexts) {
+    await fs.mkdir(path.dirname(ctx.outputPath), { recursive: true })
+    await fs.writeFile(ctx.outputPath, ctx.html, 'utf-8')
   }
 
   return contexts
