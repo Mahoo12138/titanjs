@@ -11,6 +11,7 @@
  *   })
  */
 import type { PluginDefinition, TransformContext } from '@titan/types'
+import { setEntryData } from '@titan/types'
 
 export interface TocItem {
   id: string
@@ -28,6 +29,13 @@ export interface TocOptions {
   idPrefix?: string
   /** Whether to inject anchor links into HTML (default: true) */
   injectAnchors?: boolean
+}
+
+// Declaration merging: register toc field on entries
+declare module '@titan/types' {
+  interface EntryExtensions {
+    toc: TocItem[]
+  }
 }
 
 export function pluginToc(options: TocOptions = {}): PluginDefinition {
@@ -51,7 +59,7 @@ export function pluginToc(options: TocOptions = {}): PluginDefinition {
         const tree = buildTocTree(headings, idPrefix)
 
         // Assign toc to entry
-        ;(ctx.entry as any).toc = tree
+        setEntryData(ctx.entry, 'toc', tree)
 
         // Optionally inject anchor links into HTML
         if (injectAnchors) {
