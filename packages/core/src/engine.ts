@@ -38,6 +38,7 @@ import { FileSystemCache } from './cache.js'
 import { CollectionRegistry } from './collection-registry.js'
 import { SingletonRegistry } from './singleton-registry.js'
 import { WidgetRegistry } from './widget-registry.js'
+import { BlockRegistry } from './block-registry.js'
 import { DependencyTracker, hashFile, hashData } from './dependency-tracker.js'
 import { PluginManager } from './plugin-manager.js'
 import { StyleManager } from './style-manager.js'
@@ -69,6 +70,8 @@ export interface GenerateResult {
   siteData: SiteData
   routes: Route[]
   generateCtx: GenerateContext
+  /** Prefetched block data keyed by "blockName::routeUrl" */
+  blockData: Map<string, unknown>
 }
 
 /** Result of theme resolution */
@@ -87,6 +90,7 @@ export class Engine {
   readonly collections = new CollectionRegistry()
   readonly singletons = new SingletonRegistry()
   readonly widgets = new WidgetRegistry()
+  readonly blocks = new BlockRegistry()
   private depTracker: DependencyTracker
 
   // Extracted managers
@@ -141,8 +145,8 @@ export class Engine {
       await this.depTracker.init()
     }
 
-    // Register plugin collections/singletons/widgets
-    this.pluginManager.registerContent(this.collections, this.singletons)
+    // Register plugin collections/singletons/blocks
+    this.pluginManager.registerContent(this.collections, this.singletons, this.blocks)
 
     // IoC - build execution plan, validate deps, register hooks in tier order
     this.pluginManager.buildPlanAndRegisterHooks({
@@ -293,6 +297,9 @@ export class Engine {
     const generateCtx: GenerateContext = { siteData, routes }
     await this.generatePipeline.run(generateCtx)
 
+    // Prefetch block data after routes are finalized
+    const blockData = await this.blocks.prefetchAll(generateCtx.routes, siteData)
+
     // Record dependency data
     if (!this.noCache) {
       this.recordDependencies(siteData, entries)
@@ -300,7 +307,7 @@ export class Engine {
 
     this.events.emit('generate:complete', { routeCount: generateCtx.routes.length })
 
-    return { siteData, routes: generateCtx.routes, generateCtx }
+    return { siteData, routes: generateCtx.routes, generateCtx, blockData }
   }
 
   /**
@@ -314,7 +321,7 @@ export class Engine {
     )
 
     if (theme) {
-      // Register theme widgets into WidgetRegistry
+      // Register theme widgets into WidgetRegistry (backward compat)
       if (theme.definition.widgets) {
         this.widgets.registerAll(theme.definition.widgets)
       }
@@ -326,6 +333,19 @@ export class Engine {
       }
       // Attach widget registry to theme for renderer access
       theme.widgetRegistry = this.widgets
+
+      // Register theme blocks into BlockRegistry
+      if (theme.definition.blocks) {
+        this.blocks.registerAll(theme.definition.blocks)
+      }
+      if (theme.definition.siteTree) {
+        this.blocks.setSiteTree(theme.definition.siteTree)
+      }
+      if (theme.definition.widgetsConfig) {
+        this.blocks.setBlocksConfig(theme.definition.widgetsConfig)
+      }
+      // Attach block registry to theme for renderer access
+      theme.blockRegistry = this.blocks
 
       // Build styles via StyleManager
       await this.styleManager.buildThemeStyles(
@@ -437,8 +457,14 @@ export class Engine {
 
     const { loadContexts, singletonData } = await this.loadAll()
     const { entries } = await this.transformAll(loadContexts)
-    const { generateCtx } = await this.generate(entries, singletonData)
+    const { generateCtx, blockData } = await this.generate(entries, singletonData)
     const { theme } = await this.resolveTheme()
+
+    // Attach prefetched block data to theme for renderer access
+    if (theme) {
+      theme.blockData = blockData
+    }
+
     await this.emit(generateCtx, theme)
 
     // Save cache and dependency manifests

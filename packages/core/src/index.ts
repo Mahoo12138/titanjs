@@ -27,8 +27,11 @@ export type { EntryDependencies, DependencyManifest, RouteDependencyIndex } from
 export { DevSession } from './dev-session.js'
 export type { DevSessionOptions, FileChangeResult, DevSessionStats } from './dev-session.js'
 
-// Widget system
+// Widget system (deprecated — use Block system)
 export { WidgetRegistry } from './widget-registry.js'
+
+// Block system (unified replacement for Widgets + Slot Components)
+export { BlockRegistry } from './block-registry.js'
 
 // Extracted managers
 export { PluginManager } from './plugin-manager.js'

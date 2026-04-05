@@ -3,7 +3,7 @@
  *
  * Responsibilities:
  * - Render layout component to HTML string via preact-render-to-string
- * - Provide <Slot> component that renders slot components in-place
+ * - Provide <Slot> component that renders block/slot components in-place
  * - Collect Island components for deferred client-side hydration
  * - Generate full HTML document with Island activation scripts
  */
@@ -16,7 +16,10 @@ import type {
   PageContext,
   SlotComponentDefinition,
   IslandDefinition,
+  BlockDefinition,
+  Route,
 } from '@titan/types'
+import type { BlockRegistry } from './block-registry.js'
 
 export interface IslandInstance {
   /** Unique ID for the island element */
@@ -44,12 +47,21 @@ interface RenderContextValue {
   theme: ResolvedTheme
   islands: IslandInstance[]
   islandCounter: number
+  /** Block registry for slot queries (new unified model) */
+  blockRegistry?: BlockRegistry
+  /** Prefetched block data keyed by "blockName::routeUrl" */
+  blockData?: Map<string, unknown>
+  /** Current route (needed for block data lookup) */
+  route?: Route
 }
 
 const RenderContext = createContext<RenderContextValue | null>(null)
 
 /**
- * Slot component - renders slot components registered to the named slot
+ * Slot component - renders blocks/components registered to the named slot
+ *
+ * New behavior: queries BlockRegistry for blocks targeting this slot.
+ * Falls back to legacy slotComponents map if no BlockRegistry is available.
  *
  * Usage in layouts:
  *   <Slot name="post:after-content" props={{ post, site }} />
@@ -58,6 +70,47 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
   const renderCtx = useContext(RenderContext)
   if (!renderCtx) return null
 
+  // ── New path: use BlockRegistry ──
+  if (renderCtx.blockRegistry) {
+    const blocks = renderCtx.blockRegistry.getBlocksForSlot(name)
+    if (blocks.length === 0) return null
+
+    const route = renderCtx.route
+    const children = blocks
+      .filter(b => {
+        if (!b.guard) return true
+        const config = renderCtx.blockRegistry!.resolveConfig(b.name)
+        return b.guard({ config, entry: props?.entry as any, route: route! })
+      })
+      .map((b, i) => {
+        const config = renderCtx.blockRegistry!.resolveConfig(b.name)
+        const data = renderCtx.blockData?.get(`${b.name}::${route?.url}`)
+        const vnode = b.render({ config, data, route: route!, entry: props?.entry as any, site: props?.site as any })
+
+        // Collect island if declared
+        if (b.island) {
+          const islandId = `island-${renderCtx.islandCounter++}`
+          renderCtx.islands.push({
+            id: islandId,
+            name: b.name.replace(/:/g, '-'),
+            activate: b.island.activate,
+            props,
+          })
+
+          return h('div', {
+            'data-titan-island': islandId,
+            'data-activate': b.island.activate,
+            key: `island-${name}-${i}`,
+          }, vnode)
+        }
+
+        return h(Fragment, { key: `block-${name}-${i}` }, vnode)
+      })
+
+    return children.length > 0 ? h(Fragment, null, ...children) : null
+  }
+
+  // ── Legacy path: use slotComponents map ──
   const components = renderCtx.theme.slotComponents.get(name)
   if (!components || components.length === 0) return null
 
@@ -74,7 +127,6 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
         props,
       })
 
-      // Wrap in a data-attributed div for hydration targeting
       return h('div', {
         'data-titan-island': islandId,
         'data-activate': sc.island.activate,
@@ -102,6 +154,9 @@ export function renderLayout(
     theme,
     islands,
     islandCounter: 0,
+    blockRegistry: theme.blockRegistry as BlockRegistry | undefined,
+    blockData: theme.blockData,
+    route: ctx.route,
   }
 
   // Wrap layout in RenderContext.Provider for Slot access

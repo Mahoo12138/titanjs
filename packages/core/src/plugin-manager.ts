@@ -18,6 +18,7 @@ import { PluginError } from '@titan/types'
 import type { Pipeline } from './pipeline.js'
 import type { CollectionRegistry } from './collection-registry.js'
 import type { SingletonRegistry } from './singleton-registry.js'
+import type { BlockRegistry } from './block-registry.js'
 import type { ExecutionPlan } from './ioc.js'
 import { buildExecutionPlan } from './ioc.js'
 
@@ -37,11 +38,12 @@ export class PluginManager {
   }
 
   /**
-   * Register collections and singletons declared by plugins.
+   * Register collections, singletons, and blocks declared by plugins.
    */
   registerContent(
     collections: CollectionRegistry,
     singletons: SingletonRegistry,
+    blocks?: BlockRegistry,
   ): void {
     for (const plugin of this.plugins) {
       for (const col of plugin.collections ?? []) {
@@ -49,6 +51,11 @@ export class PluginManager {
       }
       for (const s of plugin.singletons ?? []) {
         singletons.register(s)
+      }
+      if (blocks) {
+        for (const b of plugin.blocks ?? []) {
+          blocks.register(b)
+        }
       }
     }
   }
