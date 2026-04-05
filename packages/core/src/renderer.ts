@@ -7,7 +7,7 @@
  * - Collect Island components for deferred client-side hydration
  * - Generate full HTML document with Island activation scripts
  */
-import { h, type VNode, type ComponentType, createContext } from 'preact'
+import { h, Fragment, type VNode, type ComponentType, createContext } from 'preact'
 import { useContext } from 'preact/hooks'
 import renderToString from 'preact-render-to-string'
 import type {
@@ -85,7 +85,7 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
     return vnode
   })
 
-  return h('div', { 'data-slot': name } as any, ...children)
+  return h(Fragment, null, ...children)
 }
 
 /**
@@ -178,50 +178,35 @@ function safeStringify(value: unknown): string {
 function generateIslandScripts(islands: IslandInstance[]): string {
   if (islands.length === 0) return ''
 
-  const scripts = islands.map((island) => {
-    switch (island.activate) {
-      case 'client:load':
-        return `<script type="module">
-  import { hydrate } from 'preact';
-  const el = document.querySelector('[data-titan-island="${island.id}"]');
-  if (el) {
-    const { default: Comp } = await import('/assets/islands/${island.name}.js');
-    hydrate(Comp(${safeStringify(island.props ?? {})}), el);
-  }
-</script>`
+  // Build a manifest of all islands, grouped by activation strategy
+  const manifest = islands.map(island => ({
+    id: island.id,
+    name: island.name,
+    activate: island.activate,
+    props: island.props ?? {},
+  }))
 
-      case 'client:visible':
-        return `<script type="module">
-  const el = document.querySelector('[data-titan-island="${island.id}"]');
-  if (el) {
-    const observer = new IntersectionObserver(async ([entry]) => {
-      if (entry.isIntersecting) {
-        const { default: Comp } = await import('/assets/islands/${island.name}.js');
-        const { hydrate } = await import('preact');
-        hydrate(Comp(${safeStringify(island.props ?? {})}), el);
-        observer.disconnect();
-      }
+  return `<script type="module">
+import { h, hydrate } from 'preact';
+const manifest = ${safeStringify(manifest)};
+for (const island of manifest) {
+  const el = document.querySelector('[data-titan-island="' + island.id + '\"]');
+  if (!el) continue;
+  const loader = () => import('/assets/islands/' + island.name + '.js').then(m => {
+    hydrate(h(m.default, island.props), el);
+  });
+  if (island.activate === 'client:load') {
+    loader();
+  } else if (island.activate === 'client:visible') {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { loader(); observer.disconnect(); }
     });
     observer.observe(el);
+  } else if (island.activate === 'client:idle') {
+    'requestIdleCallback' in window ? requestIdleCallback(loader) : setTimeout(loader, 200);
   }
+}
 </script>`
-
-      case 'client:idle':
-        return `<script type="module">
-  const el = document.querySelector('[data-titan-island="${island.id}"]');
-  if (el) {
-    const cb = async () => {
-      const { default: Comp } = await import('/assets/islands/${island.name}.js');
-      const { hydrate } = await import('preact');
-      hydrate(Comp(${safeStringify(island.props ?? {})}), el);
-    };
-    'requestIdleCallback' in window ? requestIdleCallback(cb) : setTimeout(cb, 200);
-  }
-</script>`
-    }
-  })
-
-  return scripts.join('\n')
 }
 
 function escapeHtml(str: string): string {
