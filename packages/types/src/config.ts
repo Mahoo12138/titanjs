@@ -93,8 +93,10 @@ export interface PluginDefinition {
   produces?: string[]
   /** Pipeline hooks */
   hooks?: PluginHooks
-  /** Theme slot components (Phase 3) */
+  /** @deprecated Use blocks instead. Theme slot components (Phase 3) */
   slotComponents?: import('./theme.js').SlotComponentDefinition[]
+  /** Block definitions (unified replacement for widgets + slotComponents) */
+  blocks?: import('./block.js').BlockDefinition<any, any>[]
   /** Additional remark plugins to inject into the Markdown pipeline (Phase 4) */
   remarkPlugins?: unknown[]
   /** Additional rehype plugins to inject into the Markdown pipeline (Phase 4) */

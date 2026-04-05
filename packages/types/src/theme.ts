@@ -12,6 +12,7 @@ import type { z } from 'zod'
 import type { BaseEntry, Post, Page, SiteData, Collection, Tag, Category, Heading } from './content.js'
 import type { Route, Pagination } from './route.js'
 import type { WidgetDefinition, SiteTree, WidgetsConfig, WidgetRegistry } from './widget.js'
+import type { BlockDefinition } from './block.js'
 
 // ── Theme Definition ──
 
@@ -26,8 +27,10 @@ export interface ThemeDefinition {
   viewTransitions?: boolean
   /** Content type → layout name mapping */
   typeLayoutMap?: Record<string, string>
-  /** Widget definitions provided by this theme */
+  /** @deprecated Use blocks instead */
   widgets?: WidgetDefinition<any>[]
+  /** Block definitions provided by this theme (replaces widgets) */
+  blocks?: BlockDefinition<any, any>[]
   /** SiteTree: per-layout sidebar widget configuration */
   siteTree?: SiteTree
   /** Default widget instance configs */
@@ -44,6 +47,7 @@ export interface SlotDefinition {
   mode: 'stack' | 'replace'
 }
 
+/** @deprecated Use BlockDefinition from './block.js' instead */
 export interface SlotComponentDefinition {
   /** Target slot name */
   slot: string
@@ -73,14 +77,18 @@ export interface ResolvedTheme {
   config: Record<string, unknown>
   /** Layout modules keyed by name */
   layouts: Map<string, LayoutModule>
-  /** Slot components grouped by slot name, sorted by order */
+  /** @deprecated Slot components grouped by slot name, sorted by order. Use blockRegistry instead. */
   slotComponents: Map<string, SlotComponentDefinition[]>
   /** Content type → layout name mapping (merged from theme + plugins) */
   typeLayoutMap: Record<string, string>
   /** Theme root directory */
   rootDir: string
-  /** Widget registry for sidebar resolution */
+  /** @deprecated Widget registry for sidebar resolution. Use blockRegistry instead. */
   widgetRegistry?: WidgetRegistry
+  /** Block registry (unified replacement for widgetRegistry + slotComponents) */
+  blockRegistry?: import('./block.js').BlockRegistry
+  /** Prefetched block data keyed by "blockName::routeUrl" */
+  blockData?: Map<string, unknown>
   /** Inlined CSS from the theme's style.css (legacy, used as fallback) */
   styles?: string
   /** Processed style layers from the 5-layer system */
@@ -153,6 +161,7 @@ export function defineSlot(def: SlotDefinition): SlotDefinition {
   return def
 }
 
+/** @deprecated Use defineBlock() from './block.js' instead */
 export function defineSlotComponent(def: SlotComponentDefinition): SlotComponentDefinition {
   return def
 }

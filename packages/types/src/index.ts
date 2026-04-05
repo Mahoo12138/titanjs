@@ -69,6 +69,15 @@ export type {
 export { defineSingleton } from './singleton.js'
 
 export type {
+  BlockDefinition,
+  BlockPrefetchContext,
+  BlockRenderContext,
+  BlockGuardContext,
+  BlockRegistry,
+} from './block.js'
+export { defineBlock } from './block.js'
+
+export type {
   WidgetDefinition,
   WidgetContext,
   WidgetSiteContext,

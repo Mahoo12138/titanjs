@@ -1,12 +1,13 @@
 /**
  * Widget system types
  *
+ * @deprecated Use BlockDefinition from './block.js' instead.
+ * This module is retained for backward compatibility and will be removed
+ * in a future major version. All new code should use defineBlock().
+ *
  * Widgets are reusable UI blocks rendered in sidebars or other layout regions.
  * Themes declare built-in widgets; plugins can register additional widgets
  * via defineWidget() + TypeScript Declaration Merging on WidgetMap.
- *
- * Design: Analogous to CollectionDefinition — each widget has a name,
- * a Preact component, a Zod config schema, and an optional data loader.
  */
 import type { z } from 'zod'
 import type { SiteData, BaseEntry, Post } from './content.js'
@@ -14,6 +15,7 @@ import type { Route } from './route.js'
 
 // ── Widget Definition ──
 
+/** @deprecated Use BlockDefinition from './block.js' instead */
 export interface WidgetDefinition<TConfig = unknown> {
   /** Unique widget name (e.g. 'toc', 'recent', 'author') */
   name: string
@@ -136,6 +138,7 @@ export interface WidgetRegistry {
 
 // ── Helper function ──
 
+/** @deprecated Use defineBlock() from './block.js' instead */
 export function defineWidget<TConfig = unknown>(
   def: WidgetDefinition<TConfig>,
 ): WidgetDefinition<TConfig> {
