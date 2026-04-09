@@ -198,7 +198,7 @@ export function createCollection<T extends BaseEntry>(name: string, entries: T[]
       if (!filter) return [...entries]
       return entries.filter(entry => {
         for (const [key, value] of Object.entries(filter)) {
-          if ((entry as any)[key] !== value) return false
+          if (entry[key as keyof T] !== value) return false
         }
         return true
       })

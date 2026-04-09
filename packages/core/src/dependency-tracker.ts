@@ -18,6 +18,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { Route } from '@titan/types'
+import { getRouteTag, getRouteCategory } from '@titan/types'
 
 export interface EntryDependencies {
   /** Content hash of the source file */
@@ -244,7 +245,7 @@ export function buildRouteDependencyIndex(
 
     if (route.type === 'list') {
       if (route.contentType === 'tag' && route.data?.tag) {
-        const tagSlug = (route.data.tag as any).slug
+        const tagSlug = getRouteTag(route)?.slug
         if (tagSlug) {
           addMapping(index.tagToRoutes, tagSlug, url)
           // All entries with this tag appear on this route
@@ -259,7 +260,7 @@ export function buildRouteDependencyIndex(
       }
 
       if (route.contentType === 'category' && route.data?.category) {
-        const catSlug = (route.data.category as any).slug
+        const catSlug = getRouteCategory(route)?.slug
         if (catSlug) {
           addMapping(index.categoryToRoutes, catSlug, url)
           for (const entry of entries) {

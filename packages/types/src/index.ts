@@ -35,13 +35,27 @@ export type {
   Collection,
   SiteData,
   EntryExtensions,
+  SiteDataExtensions,
 } from './content.js'
 
-export { setEntryData, getEntryData } from './content.js'
+export {
+  setEntryData,
+  getEntryData,
+  setSiteData,
+  getSiteData,
+  getSiteCollection,
+  getAllSiteEntries,
+} from './content.js'
 
 export type {
   Route,
+  RouteData,
   Pagination,
+} from './route.js'
+
+export {
+  getRouteTag,
+  getRouteCategory,
 } from './route.js'
 
 export type {

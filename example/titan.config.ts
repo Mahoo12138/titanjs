@@ -1,3 +1,4 @@
+import { defineConfig } from '@titan/core'
 import { pluginSitemap } from '@titan/plugin-sitemap'
 import { pluginRSS } from '@titan/plugin-rss'
 import { pluginReadingTime } from '@titan/plugin-reading-time'
@@ -7,9 +8,9 @@ import { pluginComments } from '@titan/plugin-comments'
 import { pluginSearch } from '@titan/plugin-search'
 import { pluginWiki } from '@titan/plugin-wiki'
 import { pluginNotebooks } from '@titan/plugin-notebooks'
+import { pluginGithubCard } from '@titan/plugin-github-card'
 
-/** @type {import('@titan/core').UserConfig} */
-export default {
+export default defineConfig({
   title: 'Titan Example',
   url: 'https://example.com',
   language: 'zh-CN',
@@ -47,5 +48,6 @@ export default {
       },
     }),
     pluginSearch(),
+    pluginGithubCard({ username: 'octocat' }),
   ],
-}
+})

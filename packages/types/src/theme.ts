@@ -143,6 +143,10 @@ export interface ListContext extends PageContext {
   posts: Post[]
   tag?: Tag
   category?: Category
+  /** All tags (available on tags index page) */
+  tags?: Tag[]
+  /** All categories (available on categories index page) */
+  categories?: Category[]
 }
 
 /** Context for custom collection item layouts */

@@ -12,13 +12,18 @@ import type {
   EmitContext,
   Post,
   Page,
+  Tag,
+  Category,
+  BaseEntry,
   ResolvedTheme,
   PageContext,
   PostContext,
   PageLayoutContext,
   ListContext,
+  CollectionItemContext,
   SiteContext,
 } from '@titan/types'
+import { getRouteTag, getRouteCategory, getSiteCollection } from '@titan/types'
 import { renderLayout, buildHtmlDocument, Slot } from './renderer.js'
 import { resolveLayout } from './theme-loader.js'
 
@@ -157,17 +162,19 @@ function buildPageContext(
 
   // Tags index (all tags)
   if (type === 'list' && route.layout === 'tags') {
-    return { ...base, posts: [], tags: [...siteData.tags.values()] } as any
+    const ctx: ListContext = { ...base, posts: [], tags: [...siteData.tags.values()] }
+    return ctx
   }
 
   // Categories index (all categories)
   if (type === 'list' && route.layout === 'categories') {
-    return { ...base, posts: [], categories: [...siteData.categories.values()] } as any
+    const ctx: ListContext = { ...base, posts: [], categories: [...siteData.categories.values()] }
+    return ctx
   }
 
   // Tag list
   if (type === 'list' && contentType === 'tag') {
-    const tag = route.data?.tag as any
+    const tag = getRouteTag(route)
     if (!tag) return null
     const posts = siteData.posts.entries.filter(
       (p) => p.tags.some((t) => t.slug === tag.slug),
@@ -177,7 +184,7 @@ function buildPageContext(
 
   // Category list
   if (type === 'list' && contentType === 'category') {
-    const category = route.data?.category as any
+    const category = getRouteCategory(route)
     if (!category) return null
     const posts = siteData.posts.entries.filter(
       (p) => p.categories.some((c) => c.slug === category.slug),
@@ -189,31 +196,29 @@ function buildPageContext(
   if (type === 'item' && slug) {
     const entry = findEntryInSiteData(siteData, contentType, slug)
     if (!entry) return null
-    return {
+    const ctx: CollectionItemContext = {
       ...base,
       entry,
       collection: contentType,
       // Forward route data (e.g., wikiTree, notebooksTree)
       ...route.data,
-    } as any
+    }
+    return ctx
   }
 
   // Custom collection list / generic list
   // Forward any route.data (wikiTree, filterTag, notebooksTree, etc.)
-  return { ...base, posts: [], ...route.data } as any
+  const ctx: ListContext = { ...base, posts: [], ...route.data }
+  return ctx
 }
 
 function findEntryInSiteData(
   siteData: SiteData,
   contentType: string,
   slug: string,
-): any | null {
-  // Check if there's a collection for this content type
-  const collection = (siteData as any)[contentType]
-  if (collection && typeof collection === 'object' && 'findOne' in collection) {
-    return collection.findOne(slug)
-  }
-  return null
+): BaseEntry | undefined {
+  const collection = getSiteCollection(siteData, contentType)
+  return collection?.findOne(slug)
 }
 
 function extractTitle(route: Route, siteData: SiteData): string {
@@ -221,19 +226,21 @@ function extractTitle(route: Route, siteData: SiteData): string {
   if (type === 'item' && slug) {
     if (contentType === 'post') {
       const post = siteData.posts.findOne(slug)
-      return (post as any)?.title ?? slug
+      return post?.title ?? slug
     }
     if (contentType === 'page') {
       const page = siteData.pages.findOne(slug)
-      return (page as any)?.title ?? slug
+      return page?.title ?? slug
     }
   }
   if (type === 'list' && contentType === 'tag') {
-    if (route.data?.tag) return `Tag: ${(route.data.tag as any)?.name ?? ''}`
+    const tag = getRouteTag(route)
+    if (tag) return `Tag: ${tag.name ?? ''}`
     return 'Tags'
   }
   if (type === 'list' && contentType === 'category') {
-    if (route.data?.category) return `Category: ${(route.data.category as any)?.name ?? ''}`
+    const category = getRouteCategory(route)
+    if (category) return `Category: ${category.name ?? ''}`
     return 'Categories'
   }
   if (route.layout === 'archive') {
@@ -255,7 +262,7 @@ function extractDescription(route: Route, siteData: SiteData): string | undefine
   const { type, contentType, slug } = route
   if (type === 'item' && contentType === 'post' && slug) {
     const post = siteData.posts.findOne(slug)
-    return (post as any)?.excerpt
+    return post?.excerpt
   }
   return undefined
 }

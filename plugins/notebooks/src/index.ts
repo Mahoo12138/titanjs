@@ -20,7 +20,18 @@ import type {
   GenerateContext,
   BaseEntry,
   Route,
+  SiteData,
+  Collection,
 } from '@titan/types'
+import { setSiteData, getAllSiteEntries } from '@titan/types'
+
+// ── Declaration Merging: register notebooksTree on SiteData ──
+
+declare module '@titan/types' {
+  interface SiteDataExtensions {
+    notebooksTree: NotebooksTree
+  }
+}
 
 // ── Types ──
 
@@ -106,6 +117,24 @@ const notePageSchema = z.object({
   pin: z.union([z.boolean(), z.number()]).optional(),
 })
 
+/** Typed note page frontmatter (inferred from Zod schema + extra optional fields) */
+interface NoteFrontmatter {
+  notebook: string
+  title?: string
+  tags?: string[]
+  pin?: boolean | number
+  date?: string
+  updated?: string
+  notebookTitle?: string
+  notebookDescription?: string
+  notebookIcon?: string
+}
+
+/** Type-safe frontmatter access for note entries */
+function getNoteFm(entry: BaseEntry): NoteFrontmatter {
+  return entry.frontmatter as unknown as NoteFrontmatter
+}
+
 // ── Plugin ──
 
 export function pluginNotebooks(options: NotebooksOptions = {}): PluginDefinition {
@@ -143,7 +172,7 @@ export function pluginNotebooks(options: NotebooksOptions = {}): PluginDefinitio
         const { siteData, routes } = ctx
 
         // ── Collect all note entries ──
-        const noteEntries = getAllEntries(siteData).filter(
+        const noteEntries = getAllSiteEntries(siteData).filter(
           (e) => e.contentType === 'note',
         )
 
@@ -151,7 +180,7 @@ export function pluginNotebooks(options: NotebooksOptions = {}): PluginDefinitio
         const notebooksTree = buildNotebooksTree(noteEntries, baseDir, orderBy)
 
         // Inject into siteData for layouts
-        ;(siteData as any).notebooksTree = notebooksTree
+        setSiteData(siteData, 'notebooksTree', notebooksTree)
 
         // ── Generate notebooks index route ──
         routes.push({
@@ -222,7 +251,8 @@ function buildNotebooksTree(
   // Group entries by notebook ID
   const grouped = new Map<string, BaseEntry[]>()
   for (const entry of entries) {
-    const nbId = (entry.frontmatter as any).notebook
+    const fm = getNoteFm(entry)
+    const nbId = fm.notebook
     if (!nbId) continue
     if (!grouped.has(nbId)) grouped.set(nbId, [])
     grouped.get(nbId)!.push(entry)
@@ -236,31 +266,36 @@ function buildNotebooksTree(
     const sortField = sortDesc ? orderBy.slice(1) : orderBy
     noteEntries.sort((a, b) => {
       // Pin first
-      const pinA = normPin((a.frontmatter as any).pin)
-      const pinB = normPin((b.frontmatter as any).pin)
+      const pinA = normPin(getNoteFm(a).pin)
+      const pinB = normPin(getNoteFm(b).pin)
       if (pinA !== pinB) return pinB - pinA
 
-      const va = (a.frontmatter as any)[sortField] || (a as any)[sortField] || ''
-      const vb = (b.frontmatter as any)[sortField] || (b as any)[sortField] || ''
+      const fmA = getNoteFm(a)
+      const fmB = getNoteFm(b)
+      const va = a.frontmatter[sortField] || (a as unknown as Record<string, unknown>)[sortField] || ''
+      const vb = b.frontmatter[sortField] || (b as unknown as Record<string, unknown>)[sortField] || ''
       const cmp = String(va).localeCompare(String(vb))
       return sortDesc ? -cmp : cmp
     })
 
-    const noteRefs: NoteRef[] = noteEntries.map((e) => ({
-      slug: e.slug,
-      title: (e.frontmatter as any).title || e.slug,
-      url: e.url,
-      date: (e.frontmatter as any).date,
-      updated: (e.frontmatter as any).updated,
-      tags: ((e.frontmatter as any).tags || []) as string[],
-      pin: normPin((e.frontmatter as any).pin),
-    }))
+    const noteRefs: NoteRef[] = noteEntries.map((e) => {
+      const fm = getNoteFm(e)
+      return {
+        slug: e.slug,
+        title: fm.title || e.slug,
+        url: e.url,
+        date: fm.date,
+        updated: fm.updated,
+        tags: fm.tags || [],
+        pin: normPin(fm.pin),
+      }
+    })
 
     // Build hierarchical tag tree
     const tagTree = buildTagTree(noteRefs, `${baseDir}/${id}`)
 
     // Extract notebook metadata from first note or frontmatter
-    const fm = noteEntries[0]?.frontmatter as any
+    const fm = noteEntries[0] ? getNoteFm(noteEntries[0]) : undefined
 
     notebooks[id] = {
       id,
@@ -350,17 +385,4 @@ function normPin(val: unknown): number {
   if (val === true) return 1
   if (typeof val === 'number') return val
   return 0
-}
-
-function getAllEntries(siteData: any): BaseEntry[] {
-  const entries: BaseEntry[] = []
-  if (siteData.posts?.entries) entries.push(...siteData.posts.entries)
-  if (siteData.pages?.entries) entries.push(...siteData.pages.entries)
-  for (const [key, val] of Object.entries(siteData)) {
-    if (key === 'posts' || key === 'pages' || key === 'tags' || key === 'categories') continue
-    if (val && typeof val === 'object' && 'entries' in (val as any)) {
-      entries.push(...(val as any).entries)
-    }
-  }
-  return entries
 }

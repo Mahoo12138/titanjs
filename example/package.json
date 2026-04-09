@@ -20,6 +20,7 @@
     "@titan/plugin-tag-plugins": "workspace:*",
     "@titan/plugin-comments": "workspace:*",
     "@titan/plugin-search": "workspace:*",
+    "@titan/plugin-github-card": "workspace:*",
     "titan-theme-stellar": "workspace:*",
     "preact": "^10.29.1"
   }

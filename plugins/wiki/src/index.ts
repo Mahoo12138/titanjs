@@ -15,14 +15,20 @@
  *   }
  */
 import { z } from 'zod'
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import type {
   PluginDefinition,
   GenerateContext,
   BaseEntry,
-  Route,
 } from '@titan/types'
+import { setSiteData, getAllSiteEntries } from '@titan/types'
+
+// ── Declaration Merging: register wikiTree on SiteData ──
+
+declare module '@titan/types' {
+  interface SiteDataExtensions {
+    wikiTree: WikiTree
+  }
+}
 
 // ── Types ──
 
@@ -81,6 +87,23 @@ const wikiPageSchema = z.object({
   order: z.number().optional(),
 })
 
+/** Typed wiki page frontmatter (inferred from the Zod schema + extra optional fields) */
+interface WikiFrontmatter {
+  wiki: string
+  title?: string
+  order?: number
+  tags?: string[]
+  projectTitle?: string
+  projectDescription?: string
+  projectIcon?: string
+  projectSort?: number
+}
+
+/** Type-safe frontmatter access for wiki entries */
+function getWikiFm(entry: BaseEntry): WikiFrontmatter {
+  return entry.frontmatter as unknown as WikiFrontmatter
+}
+
 // ── Plugin ──
 
 export function pluginWiki(options: WikiOptions = {}): PluginDefinition {
@@ -116,7 +139,7 @@ export function pluginWiki(options: WikiOptions = {}): PluginDefinition {
         const { siteData, routes } = ctx
 
         // ── Build wiki tree from entries + data files ──
-        const wikiEntries = getAllEntries(siteData).filter(
+        const wikiEntries = getAllSiteEntries(siteData).filter(
           (e) => e.contentType === 'wiki',
         )
 
@@ -125,7 +148,7 @@ export function pluginWiki(options: WikiOptions = {}): PluginDefinition {
         const wikiTree = buildWikiTree(wikiEntries, baseDir)
 
         // Inject wikiTree into siteData for layouts to access
-        ;(siteData as any).wikiTree = wikiTree
+        setSiteData(siteData, 'wikiTree', wikiTree)
 
         // ── Generate wiki index route ──
         routes.push({
@@ -163,7 +186,8 @@ function buildWikiTree(entries: BaseEntry[], baseDir: string): WikiTree {
   // Group entries by wiki project ID
   const grouped = new Map<string, BaseEntry[]>()
   for (const entry of entries) {
-    const projectId = (entry.frontmatter as any).wiki
+    const fm = getWikiFm(entry)
+    const projectId = fm.wiki
     if (!projectId) continue
     if (!grouped.has(projectId)) grouped.set(projectId, [])
     grouped.get(projectId)!.push(entry)
@@ -175,15 +199,15 @@ function buildWikiTree(entries: BaseEntry[], baseDir: string): WikiTree {
   for (const [id, pages] of grouped) {
     // Sort pages: by frontmatter order, then by slug
     pages.sort((a, b) => {
-      const oa = (a.frontmatter as any).order ?? 999
-      const ob = (b.frontmatter as any).order ?? 999
+      const oa = getWikiFm(a).order ?? 999
+      const ob = getWikiFm(b).order ?? 999
       if (oa !== ob) return oa - ob
       return a.slug.localeCompare(b.slug)
     })
 
     const pageRefs: WikiPageRef[] = pages.map((p) => ({
       slug: p.slug,
-      title: (p.frontmatter as any).title || p.slug,
+      title: getWikiFm(p).title || p.slug,
       url: p.url,
     }))
 
@@ -193,7 +217,7 @@ function buildWikiTree(entries: BaseEntry[], baseDir: string): WikiTree {
 
     // Extract project metadata from the first page or frontmatter
     const firstPage = pages[0]
-    const fm = firstPage?.frontmatter as any
+    const fm = firstPage ? getWikiFm(firstPage) : undefined
     const projectTags = fm?.tags ?? []
 
     projects[id] = {
@@ -221,20 +245,6 @@ function buildWikiTree(entries: BaseEntry[], baseDir: string): WikiTree {
     .map((p) => p.id)
 
   return { projects, shelf, tags: allTags }
-}
-
-function getAllEntries(siteData: any): BaseEntry[] {
-  const entries: BaseEntry[] = []
-  if (siteData.posts?.entries) entries.push(...siteData.posts.entries)
-  if (siteData.pages?.entries) entries.push(...siteData.pages.entries)
-  // Also check custom collections
-  for (const [key, val] of Object.entries(siteData)) {
-    if (key === 'posts' || key === 'pages' || key === 'tags' || key === 'categories') continue
-    if (val && typeof val === 'object' && 'entries' in (val as any)) {
-      entries.push(...(val as any).entries)
-    }
-  }
-  return entries
 }
 
 function slugify(text: string): string {

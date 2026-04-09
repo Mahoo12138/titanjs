@@ -18,6 +18,8 @@ import type {
   IslandDefinition,
   BlockDefinition,
   Route,
+  BaseEntry,
+  SiteContext,
 } from '@titan/types'
 import type { BlockRegistry } from './block-registry.js'
 
@@ -57,6 +59,13 @@ interface RenderContextValue {
 
 const RenderContext = createContext<RenderContextValue | null>(null)
 
+/** Props passed to <Slot> by layout components */
+export interface SlotProps {
+  entry?: BaseEntry
+  site?: SiteContext
+  [key: string]: unknown
+}
+
 /**
  * Slot component - renders blocks/components registered to the named slot
  *
@@ -66,7 +75,7 @@ const RenderContext = createContext<RenderContextValue | null>(null)
  * Usage in layouts:
  *   <Slot name="post:after-content" props={{ post, site }} />
  */
-export function Slot({ name, props }: { name: string; props?: Record<string, unknown> }): VNode | null {
+export function Slot({ name, props }: { name: string; props?: SlotProps }): VNode | null {
   const renderCtx = useContext(RenderContext)
   if (!renderCtx) return null
 
@@ -80,12 +89,12 @@ export function Slot({ name, props }: { name: string; props?: Record<string, unk
       .filter(b => {
         if (!b.guard) return true
         const config = renderCtx.blockRegistry!.resolveConfig(b.name)
-        return b.guard({ config, entry: props?.entry as any, route: route! })
+        return b.guard({ config, entry: props?.entry, route: route! })
       })
       .map((b, i) => {
         const config = renderCtx.blockRegistry!.resolveConfig(b.name)
         const data = renderCtx.blockData?.get(`${b.name}::${route?.url}`)
-        const vnode = b.render({ config, data, route: route!, entry: props?.entry as any, site: props?.site as any })
+        const vnode = b.render({ config, data, route: route!, entry: props?.entry, site: props?.site as SiteContext })
 
         // Collect island if declared
         if (b.island) {

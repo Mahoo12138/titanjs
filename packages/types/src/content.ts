@@ -150,12 +150,86 @@ export interface Collection<T extends BaseEntry = BaseEntry> {
   count(): number
 }
 
+// ── SiteData Extensions (Declaration Merging) ──
+
+/**
+ * Plugins extend this interface via TypeScript Declaration Merging
+ * to register their SiteData fields with type safety.
+ *
+ * Example (in a plugin):
+ *   declare module '@titan/types' {
+ *     interface SiteDataExtensions {
+ *       wikiTree: WikiTree
+ *       notebooksTree: NotebooksTree
+ *     }
+ *   }
+ *
+ * Then plugins can use `setSiteData(siteData, 'wikiTree', tree)` instead of `(siteData as any).wikiTree = tree`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SiteDataExtensions {}
+
+/**
+ * Set a plugin-provided data field on SiteData (type-safe).
+ */
+export function setSiteData<K extends keyof SiteDataExtensions>(
+  siteData: SiteData,
+  key: K,
+  value: SiteDataExtensions[K],
+): void {
+  ;(siteData as any)[key] = value
+}
+
+/**
+ * Get a plugin-provided data field from SiteData (type-safe).
+ */
+export function getSiteData<K extends keyof SiteDataExtensions>(
+  siteData: SiteData,
+  key: K,
+): SiteDataExtensions[K] | undefined {
+  return (siteData as any)[key]
+}
+
+/**
+ * Get a custom collection from SiteData by content type name (type-safe).
+ * Returns undefined if the collection doesn't exist.
+ */
+export function getSiteCollection(
+  siteData: SiteData,
+  contentType: string,
+): Collection<BaseEntry> | undefined {
+  const val = siteData[contentType]
+  if (val && typeof val === 'object' && 'findOne' in val) {
+    return val as Collection<BaseEntry>
+  }
+  return undefined
+}
+
+/**
+ * Collect all entries from all collections in SiteData.
+ * Includes posts, pages, and any custom collections.
+ */
+export function getAllSiteEntries(siteData: SiteData): BaseEntry[] {
+  const entries: BaseEntry[] = []
+  if (siteData.posts?.entries) entries.push(...siteData.posts.entries)
+  if (siteData.pages?.entries) entries.push(...siteData.pages.entries)
+  // Also check custom collections
+  for (const [key, val] of Object.entries(siteData)) {
+    if (key === 'posts' || key === 'pages' || key === 'tags' || key === 'categories') continue
+    if (val && typeof val === 'object' && 'entries' in (val as object)) {
+      entries.push(...(val as Collection<BaseEntry>).entries)
+    }
+  }
+  return entries
+}
+
 // ── SiteData ──
 
-export interface SiteData {
+export interface SiteData extends SiteDataExtensions {
   posts: Collection<Post>
   pages: Collection<Page>
   tags: Map<string, Tag>
   categories: Map<string, Category>
+  /** Index signature for dynamic collections and plugin extensions */
   [key: string]: unknown
 }

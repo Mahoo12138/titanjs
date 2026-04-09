@@ -1,6 +1,7 @@
 /**
  * Route types
  */
+import type { Tag, Category } from './content.js'
 
 export interface Route {
   /** Route path pattern, e.g. '/posts/:slug' */
@@ -20,7 +21,27 @@ export interface Route {
   /** Pagination info (for paginated routes) */
   pagination?: Pagination
   /** Additional route data */
-  data?: Record<string, unknown>
+  data?: RouteData
+}
+
+/**
+ * Route data can be any of the typed variants or arbitrary plugin data.
+ * Use the helper functions to access typed fields safely.
+ */
+export type RouteData = Record<string, unknown>
+
+/**
+ * Get a typed Tag from route data.
+ */
+export function getRouteTag(route: Route): Tag | undefined {
+  return route.data?.tag as Tag | undefined
+}
+
+/**
+ * Get a typed Category from route data.
+ */
+export function getRouteCategory(route: Route): Category | undefined {
+  return route.data?.category as Category | undefined
 }
 
 export interface Pagination {
